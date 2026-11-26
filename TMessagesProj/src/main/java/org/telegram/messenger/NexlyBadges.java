@@ -6,6 +6,7 @@ import org.json.JSONObject;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.concurrent.ConcurrentHashMap;
+import org.telegram.messenger.NexlyBadges;
 
 public class NexlyBadges {
 
