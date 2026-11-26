@@ -683,6 +683,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
     private boolean drawVerified;
     private String nexlyBadgeType;
+    private Paint nexlyBadgePaint;
+    private Paint nexlyBadgeTextPaint;
     private boolean drawBotVerified;
     private boolean drawPremium;
     private final View emojiStatusView;
@@ -1289,9 +1291,20 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         if (isTransitionSupport) {
             return;
         }
+                String newNexlyBadge = null;
+        if (currentDialogFolderId == 0 && !isTopic && encryptedChat == null) {
+            if (user != null) {
+                newNexlyBadge = NexlyBadges.getBadge(user.id);
+            } else if (chat != null) {
+                newNexlyBadge = NexlyBadges.getBadge(-chat.id);
+            }
+        }
+        boolean nexlyBadgeChanged = !Objects.equals(newNexlyBadge, nexlyBadgeType);
+        nexlyBadgeType = newNexlyBadge;
+
         if (isDialogCell) {
             boolean needUpdate = updateHelper.update();
-            if (!needUpdate && currentDialogFolderId == 0 && currentDialogCommunityId == 0 && encryptedChat == null) {
+            if (!needUpdate && !nexlyBadgeChanged && currentDialogFolderId == 0 && currentDialogCommunityId == 0 && encryptedChat == null) {
                 return;
             }
         }
@@ -2425,6 +2438,11 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         if (drawBotVerified) {
             nameWidth -= dp(21);
         }
+
+        if (nexlyBadgeType != null && !LocaleController.isRTL) {
+            nameWidth -= dp(22);
+        }
+        
         if (namePaddingEnd > 0) {
             nameWidth -= namePaddingEnd;
             if (LocaleController.isRTL) {
@@ -4589,6 +4607,46 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 (drawScam == 1 ? Theme.dialogs_scamDrawable : Theme.dialogs_fakeDrawable).draw(canvas);
             }
 
+                        if (nexlyBadgeType != null && !LocaleController.isRTL && nameLayout != null) {
+                if (nexlyBadgePaint == null) {
+                    nexlyBadgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                    nexlyBadgeTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                    nexlyBadgeTextPaint.setColor(Color.WHITE);
+                    nexlyBadgeTextPaint.setTextAlign(Paint.Align.CENTER);
+                    nexlyBadgeTextPaint.setTypeface(AndroidUtilities.bold());
+                    nexlyBadgeTextPaint.setTextSize(dp(10));
+                }
+                int bx = nameMuteLeft;
+                if (drawVerified) {
+                    bx += Theme.dialogs_verifiedDrawable.getIntrinsicWidth() + dp(4);
+                } else if (drawPremium) {
+                    bx += dp(24);
+                } else if (drawScam != 0) {
+                    bx += (drawScam == 1 ? Theme.dialogs_scamDrawable : Theme.dialogs_fakeDrawable).getIntrinsicWidth() + dp(4);
+                } else if (dialogMuted || drawUnmute) {
+                    bx += Theme.dialogs_muteDrawable.getIntrinsicWidth() + dp(4);
+                }
+                float badgeR = dp(8);
+                float badgeCx = bx + badgeR;
+                float badgeCy = dp(useForceThreeLines || SharedConfig.useThreeLinesLayout ? 22f : 25f);
+                if ((!(useForceThreeLines || SharedConfig.useThreeLinesLayout) || isForumCell()) && hasTags()) {
+                    badgeCy -= dp(9);
+                }
+                int badgeColor;
+                switch (nexlyBadgeType) {
+                    case "creator": badgeColor = 0xFFFFB300; break;
+                    case "admin": badgeColor = 0xFFE53935; break;
+                    case "moderator": badgeColor = 0xFF43A047; break;
+                    case "media": badgeColor = 0xFF8E24AA; break;
+                    case "donator": badgeColor = 0xFF1E88E5; break;
+                    default: badgeColor = 0xFF757575; break;
+                }
+                nexlyBadgePaint.setColor(badgeColor);
+                canvas.drawCircle(badgeCx, badgeCy, badgeR, nexlyBadgePaint);
+                Paint.FontMetrics badgeFm = nexlyBadgeTextPaint.getFontMetrics();
+                canvas.drawText(nexlyBadgeType.substring(0, 1).toUpperCase(), badgeCx, badgeCy - (badgeFm.ascent + badgeFm.descent) / 2f, nexlyBadgeTextPaint);
+            }
+            
             if (drawReorder || reorderIconProgress != 0) {
                 if (!LocaleController.isRTL) {
                     final Paint reorderGradientPaint = getPaintReorderGradient();
