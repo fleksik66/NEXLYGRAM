@@ -20,8 +20,10 @@ jobs:
 
       - name: Accept licenses and install NDK/CMake
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager --install "ndk;27.2.12479018" "cmake;3.22.1"
+          SDKMANAGER=$(find $ANDROID_HOME -name "sdkmanager" -type f | head -n 1)
+          echo "Using sdkmanager at: $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses || true
+          "$SDKMANAGER" --install "ndk;27.2.12479018" "cmake;3.22.1"
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
 
