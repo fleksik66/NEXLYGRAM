@@ -18,12 +18,12 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install NDK and CMake
+      - name: Accept licenses and install NDK/CMake
         run: |
+          yes | sdkmanager --licenses || true
           sdkmanager --install "ndk;27.2.12479018" "cmake;3.22.1"
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
 
       - name: Make gradlew executable
         run: chmod +x gradlew
