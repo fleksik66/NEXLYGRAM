@@ -672,6 +672,10 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
             }
             nameTextView.setText(name);
         }
+        String nexlyType = currentUser != null ? org.telegram.messenger.NexlyBadges.getBadge(currentUser.id) : (currentChat != null ? org.telegram.messenger.NexlyBadges.getBadge(-currentChat.id) : null);
+        if (nexlyType != null) {
+            nameTextView.setText(org.telegram.messenger.NexlyBadgeSpan.append(nameTextView.getText(), nexlyType, nameTextView, dp(18)));
+        }
         long botVerificationIcon = 0;
         if (currentUser != null) {
             botVerificationIcon = DialogObject.getBotVerificationIcon(currentUser);
