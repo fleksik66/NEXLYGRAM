@@ -634,10 +634,13 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
         if (nameWidth < 0) {
             nameWidth = 0;
         }
-        CharSequence nameStringFinal = TextUtils.ellipsize(nameString, currentNamePaint, nameWidth - dp(12), TextUtils.TruncateAt.END);
+        String nexlyType = savedMessages ? null : (user != null ? org.telegram.messenger.NexlyBadges.getBadge(user.id) : (chat != null ? org.telegram.messenger.NexlyBadges.getBadge(-chat.id) : null));
+        int nexlyWidth = nexlyType != null ? org.telegram.messenger.NexlyBadgeSpan.width(dp(18)) : 0;
+        CharSequence nameStringFinal = TextUtils.ellipsize(nameString, currentNamePaint, Math.max(0, nameWidth - dp(12) - nexlyWidth), TextUtils.TruncateAt.END);
         if (nameStringFinal != null) {
             nameStringFinal = Emoji.replaceEmoji(nameStringFinal, currentNamePaint.getFontMetricsInt(), false);
         }
+        nameStringFinal = org.telegram.messenger.NexlyBadgeSpan.append(nameStringFinal, nexlyType, this, dp(18));
         nameLayout = new StaticLayout(nameStringFinal, currentNamePaint, nameWidth, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
 
         CharSequence statusString = null;
