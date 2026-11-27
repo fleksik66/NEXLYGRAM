@@ -685,6 +685,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private String nexlyBadgeType;
     private Paint nexlyBadgePaint;
     private Paint nexlyBadgeTextPaint;
+    private final RectF nexlyBadgeRect = new RectF();
+    private boolean nexlyBadgePressed;
     private boolean drawBotVerified;
     private boolean drawPremium;
     private final View emojiStatusView;
@@ -2440,7 +2442,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         }
 
         if (nexlyBadgeType != null && !LocaleController.isRTL) {
-            nameWidth -= dp(22);
+            nameWidth -= dp(24);
         }
         
         if (namePaddingEnd > 0) {
@@ -4607,15 +4609,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 (drawScam == 1 ? Theme.dialogs_scamDrawable : Theme.dialogs_fakeDrawable).draw(canvas);
             }
 
-                        if (nexlyBadgeType != null && !LocaleController.isRTL && nameLayout != null) {
-                if (nexlyBadgePaint == null) {
-                    nexlyBadgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                    nexlyBadgeTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                    nexlyBadgeTextPaint.setColor(Color.WHITE);
-                    nexlyBadgeTextPaint.setTextAlign(Paint.Align.CENTER);
-                    nexlyBadgeTextPaint.setTypeface(AndroidUtilities.bold());
-                    nexlyBadgeTextPaint.setTextSize(dp(10));
-                }
+            if (nexlyBadgeType != null && !LocaleController.isRTL && nameLayout != null) {
                 int bx = nameMuteLeft;
                 if (drawVerified) {
                     bx += Theme.dialogs_verifiedDrawable.getIntrinsicWidth() + dp(4);
@@ -4626,27 +4620,20 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 } else if (dialogMuted || drawUnmute) {
                     bx += Theme.dialogs_muteDrawable.getIntrinsicWidth() + dp(4);
                 }
-                float badgeR = dp(8);
+                float badgeR = dp(9);
                 float badgeCx = bx + badgeR;
                 float badgeCy = dp(useForceThreeLines || SharedConfig.useThreeLinesLayout ? 22f : 25f);
                 if ((!(useForceThreeLines || SharedConfig.useThreeLinesLayout) || isForumCell()) && hasTags()) {
                     badgeCy -= dp(9);
                 }
-                int badgeColor;
-                switch (nexlyBadgeType) {
-                    case "creator": badgeColor = 0xFFFFB300; break;
-                    case "admin": badgeColor = 0xFFE53935; break;
-                    case "moderator": badgeColor = 0xFF43A047; break;
-                    case "media": badgeColor = 0xFF8E24AA; break;
-                    case "donator": badgeColor = 0xFF1E88E5; break;
-                    default: badgeColor = 0xFF757575; break;
-                }
-                nexlyBadgePaint.setColor(badgeColor);
-                canvas.drawCircle(badgeCx, badgeCy, badgeR, nexlyBadgePaint);
-                Paint.FontMetrics badgeFm = nexlyBadgeTextPaint.getFontMetrics();
-                canvas.drawText(nexlyBadgeType.substring(0, 1).toUpperCase(), badgeCx, badgeCy - (badgeFm.ascent + badgeFm.descent) / 2f, nexlyBadgeTextPaint);
+                NexlyBadges.draw(canvas, badgeCx, badgeCy, badgeR, nexlyBadgeType);
+                float touchPad = dp(8);
+                nexlyBadgeRect.set(gtx + badgeCx - badgeR - touchPad, gty + badgeCy - badgeR - touchPad, gtx + badgeCx + badgeR + touchPad, gty + badgeCy + badgeR + touchPad);
+                postInvalidateDelayed(32, (int) (gtx + badgeCx - badgeR) - 1, (int) (gty + badgeCy - badgeR) - 1, (int) (gtx + badgeCx + badgeR) + 2, (int) (gty + badgeCy + badgeR) + 2);
+            } else {
+                nexlyBadgeRect.setEmpty();
             }
-            
+
             if (drawReorder || reorderIconProgress != 0) {
                 if (!LocaleController.isRTL) {
                     final Paint reorderGradientPaint = getPaintReorderGradient();
@@ -6240,6 +6227,30 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     public boolean onTouchEvent(MotionEvent event) {
         if (rightFragmentOpenedProgress == 0 && !isTopic && !isShareToStoryCell && storyParams.checkOnTouchEvent(event, this)) {
             return true;
+        }
+        if (nexlyBadgeType != null && !nexlyBadgeRect.isEmpty() && rightFragmentOpenedProgress == 0) {
+            final int action = event.getAction();
+            final boolean hit = nexlyBadgeRect.contains(event.getX(), event.getY());
+            if (action == MotionEvent.ACTION_DOWN && hit) {
+                nexlyBadgePressed = true;
+                return true;
+            }
+            if (nexlyBadgePressed) {
+                if (action == MotionEvent.ACTION_UP) {
+                    nexlyBadgePressed = false;
+                    if (hit) {
+                        try {
+                            performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                        } catch (Exception ignore) {}
+                        NexlyBadges.showInfo(getContext(), nexlyBadgeType);
+                    }
+                    return true;
+                } else if (action == MotionEvent.ACTION_CANCEL) {
+                    nexlyBadgePressed = false;
+                    return true;
+                }
+                return true;
+            }
         }
         if (delegate == null || delegate.canClickButtonInside()) {
             if (openBot) {
