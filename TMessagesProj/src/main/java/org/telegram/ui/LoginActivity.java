@@ -2052,7 +2052,8 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             super(context);
 
             setOrientation(VERTICAL);
-            setGravity(Gravity.CENTER);
+            setGravity(Gravity.LEFT);
+            setPadding(0, dp(56), 0, dp(24));
 
             titleView = new TextView(context);
             titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 30);
@@ -2060,6 +2061,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             titleView.setText(getString(activityMode == MODE_CHANGE_PHONE_NUMBER ? R.string.ChangePhoneNewNumber : R.string.YourNumber));
             titleView.setGravity(Gravity.LEFT);
             titleView.setLineSpacing(dp(2), 1.0f);
+            titleView.setLetterSpacing(-0.02f);
             ThemeBind.textColor(titleView, Theme.key_windowBackgroundWhiteBlackText);
             addView(titleView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT, 24, 0, 24, 0));
             titleView.setOnClickListener(v -> {
@@ -2126,7 +2128,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             countryOutlineView.setFocusable(true);
             countryOutlineView.setContentDescription(getString(R.string.Country));
             countryOutlineView.setOnFocusChangeListener((v, hasFocus) -> countryOutlineView.animateSelection(hasFocus ? 1 : 0));
-            addView(countryOutlineView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 58, 16, 24, 16, 14));
+            addView(countryOutlineView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 60, 24, 32, 24, 12));
             countryOutlineView.setOnClickListener(view -> {
                 CountrySelectActivity fragment = new CountrySelectActivity(true, countriesArray);
                 fragment.setCountrySelectActivityDelegate((country) -> {
@@ -2144,7 +2146,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             phoneOutlineView = new OutlineTextContainerView(context);
             phoneOutlineView.addView(linearLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 16, 8, 16, 8));
             phoneOutlineView.setText(getString(R.string.PhoneNumber));
-            addView(phoneOutlineView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 58, 16, 8, 16, 8));
+            addView(phoneOutlineView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 60, 24, 8, 24, 8));
 
             plusTextView = new TextView(context);
             plusTextView.setText("+");
