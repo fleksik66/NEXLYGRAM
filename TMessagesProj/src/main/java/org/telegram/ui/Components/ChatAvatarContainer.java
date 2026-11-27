@@ -944,6 +944,12 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         if (value != null) {
             value = Emoji.replaceEmoji(value, titleTextView.getPaint().getFontMetricsInt(), false);
         }
+        if (value != null && parentFragment != null && !parentFragment.isTopic && parentFragment.getChatMode() == 0) {
+            TLRPC.User nexlyUser = parentFragment.getCurrentUser();
+            TLRPC.Chat nexlyChat = parentFragment.getCurrentChat();
+            String nexlyType = nexlyUser != null ? org.telegram.messenger.NexlyBadges.getBadge(nexlyUser.id) : (nexlyChat != null ? org.telegram.messenger.NexlyBadges.getBadge(-nexlyChat.id) : null);
+            value = org.telegram.messenger.NexlyBadgeSpan.append(value, nexlyType, titleTextView, dp(20));
+        }
         titleTextView.setText(value);
         rightDrawableIsScam = false;
         if (scam || fake) {
