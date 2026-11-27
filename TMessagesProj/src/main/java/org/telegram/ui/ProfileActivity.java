@@ -11761,7 +11761,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 avatarImage.setAnimateFromImageReceiver(fromAvatarImage.getImageReceiver());
             }
             {
-                nameTextView.setText(newString);
+                String nexlyType = org.telegram.messenger.NexlyBadges.getBadge(user.id);
+                nameTextView.setText(org.telegram.messenger.NexlyBadgeSpan.append(newString, nexlyType, nameTextView, dp(20)));
+                org.telegram.messenger.NexlyBadgeSpan.setupClick(nameTextView, nexlyType);
                 if (simpleActionBar != null) {
                     simpleActionBar.setTitle(newString);
                 }
@@ -12029,7 +12031,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         title = Emoji.replaceEmoji(title, nameTextView.getPaint().getFontMetricsInt(), false);
                     } catch (Exception ignore) {
                     }
-                    if (nameTextView.setText(title)) {
+                    String nexlyType = isTopic ? null : org.telegram.messenger.NexlyBadges.getBadge(-chat.id);
+                    org.telegram.messenger.NexlyBadgeSpan.setupClick(nameTextView, nexlyType);
+                    if (nameTextView.setText(org.telegram.messenger.NexlyBadgeSpan.append(title, nexlyType, nameTextView, dp(20)))) {
                         changed = true;
                     }
                     if (simpleActionBar != null) {
