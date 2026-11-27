@@ -2,6 +2,7 @@ package org.telegram.ui.Components;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Region;
@@ -87,6 +88,7 @@ public class OutlineTextContainerView extends FrameLayout implements Theme.Color
     private EditText attachedEditText;
     private boolean forceUseCenter, forceUseCenter2, forceForceUseCenter;
     private boolean filledStyle;
+    private boolean monochrome;
 
     private final Theme.ResourcesProvider resourcesProvider;
 
@@ -110,6 +112,11 @@ public class OutlineTextContainerView extends FrameLayout implements Theme.Color
         updateColor();
 
         setPadding(0, AndroidUtilities.dp(6), 0, 0);
+    }
+
+    public void setMonochrome(boolean monochrome) {
+        this.monochrome = monochrome;
+        invalidate();
     }
 
     public void setFilledStyle(boolean filledStyle) {
@@ -250,7 +257,7 @@ public class OutlineTextContainerView extends FrameLayout implements Theme.Color
 
         float borderAlpha = Math.min(1f, selectionProgress + errorProgress);
         if (borderAlpha > 0.01f) {
-            strokePaint.setColor(outlinePaint.getColor());
+            strokePaint.setColor(monochrome ? Color.WHITE : outlinePaint.getColor());
             strokePaint.setAlpha(Math.round(255 * borderAlpha));
             float inset = strokePaint.getStrokeWidth() / 2f;
             rect.set(left + inset, top + inset, right - inset, bottom - inset);

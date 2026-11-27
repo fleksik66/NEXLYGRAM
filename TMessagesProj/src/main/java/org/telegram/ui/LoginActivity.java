@@ -45,6 +45,9 @@ import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.content.res.ColorStateList;
 import android.net.ConnectivityManager;
 import android.net.Uri;
 import android.os.Build;
@@ -1989,13 +1992,44 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
     private TLRPC.TL_help_termsOfService currentTermsOfService;
 
+    // ---- iOS-style helpers for the phone screen ----
+    private static final int IOS_GROUP_COLOR = 0xFF1C1C1E;
+    private static final int IOS_SEPARATOR_COLOR = 0xFF38383A;
+
+    private static GradientDrawable createIosGroupBackground(float radiusDp) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(IOS_GROUP_COLOR);
+        d.setCornerRadius(dp(radiusDp));
+        return d;
+    }
+
+    private static Drawable createIosRowRipple(float radiusDp, boolean top) {
+        float r = dp(radiusDp);
+        GradientDrawable mask = new GradientDrawable();
+        mask.setColor(0xFFFFFFFF);
+        mask.setCornerRadii(top ? new float[]{r, r, r, r, 0, 0, 0, 0} : new float[]{0, 0, 0, 0, r, r, r, r});
+        return new RippleDrawable(ColorStateList.valueOf(0x1FFFFFFF), null, mask);
+    }
+
+    /** Flat row inside the grouped card. Keeps animateSelection/updateColor so PhoneView code stays unchanged. */
+    private static class IosFieldRow extends FrameLayout {
+        public IosFieldRow(Context context) {
+            super(context);
+        }
+        public void animateSelection(float value) {
+            // iOS has no focus ring - intentionally empty
+        }
+        public void updateColor() {
+        }
+    }
+
     public class PhoneView extends SlideView implements AdapterView.OnItemSelectedListener, NotificationCenter.NotificationCenterDelegate {
         private AnimatedPhoneNumberEditText codeField;
         private AnimatedPhoneNumberEditText phoneField;
         private TextView titleView;
         private TextViewSwitcher countryButton;
-        private OutlineTextContainerView countryOutlineView;
-        private OutlineTextContainerView phoneOutlineView;
+        private IosFieldRow countryOutlineView;
+        private IosFieldRow phoneOutlineView;
         private TextView plusTextView;
         private LinkSpanDrawable.LinksTextView subtitleView;
         private View codeDividerView;
@@ -2050,20 +2084,21 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
         public PhoneView(Context context) {
             super(context);
+            setBackgroundColor(0xFF000000);
 
             setOrientation(VERTICAL);
             setGravity(Gravity.LEFT);
-            setPadding(0, dp(56), 0, dp(24));
+            setPadding(0, dp(72), 0, dp(24));
 
             titleView = new TextView(context);
-            titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 30);
+            titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 28);
             titleView.setTypeface(AndroidUtilities.bold());
             titleView.setText(getString(activityMode == MODE_CHANGE_PHONE_NUMBER ? R.string.ChangePhoneNewNumber : R.string.YourNumber));
-            titleView.setGravity(Gravity.LEFT);
+            titleView.setGravity(Gravity.CENTER_HORIZONTAL);
             titleView.setLineSpacing(dp(2), 1.0f);
             titleView.setLetterSpacing(-0.02f);
             ThemeBind.textColor(titleView, Theme.key_windowBackgroundWhiteBlackText);
-            addView(titleView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT, 24, 0, 24, 0));
+            addView(titleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 16, 0, 16, 0));
             titleView.setOnClickListener(v -> {
                 if (lastTitleToast != null) {
                     lastTitleToast.cancel();
@@ -2088,23 +2123,24 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
             subtitleView = new LinkSpanDrawable.LinksTextView(context);
             subtitleView.setText(getString(activityMode == MODE_CHANGE_PHONE_NUMBER ? R.string.ChangePhoneHelp : R.string.StartText));
-            subtitleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
-            subtitleView.setGravity(Gravity.LEFT);
+            subtitleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+            subtitleView.setGravity(Gravity.CENTER_HORIZONTAL);
             subtitleView.setLineSpacing(dp(3), 1.0f);
             ThemeBind.textColor(subtitleView, Theme.key_windowBackgroundWhiteGrayText);
-            addView(subtitleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT, 24, 10, 24, 0));
+            addView(subtitleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 24, 8, 24, 0));
 
             countryButton = new TextViewSwitcher(context);
             countryButton.setFactory(() -> {
                 TextView tv = new TextView(context);
-                tv.setPadding(dp(16), dp(12), dp(16), dp(12));
-                tv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+                tv.setPadding(dp(16), dp(12), dp(8), dp(12));
+                tv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
+                tv.setHint(getString(R.string.Country));
                 ThemeBind.textColor(tv, Theme.key_windowBackgroundWhiteBlackText);
                 ThemeBind.hintTextColor(tv, Theme.key_windowBackgroundWhiteHintText);
                 tv.setMaxLines(1);
                 tv.setSingleLine(true);
                 tv.setEllipsize(TextUtils.TruncateAt.END);
-                tv.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.CENTER_HORIZONTAL);
+                tv.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.CENTER_VERTICAL);
                 return tv;
             });
 
@@ -2121,15 +2157,17 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             countryButtonLinearLayout.addView(countryButton, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f, 0, 0, 0, 0));
             countryButtonLinearLayout.addView(chevronRight, LayoutHelper.createLinearRelatively(24, 24, 0, 0, 0, 14, 0));
 
-            countryOutlineView = new OutlineTextContainerView(context);
-            countryOutlineView.setText(getString(R.string.Country));
-            countryOutlineView.setFilledStyle(true);
-            countryOutlineView.addView(countryButtonLinearLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP, 0, 0, 0, 0));
-            countryOutlineView.setForceUseCenter(true);
+            // iOS-style grouped card: [country row] / hairline / [phone row]
+            LinearLayout groupCard = new LinearLayout(context);
+            groupCard.setOrientation(VERTICAL);
+            groupCard.setBackground(createIosGroupBackground(14));
+
+            countryOutlineView = new IosFieldRow(context);
+            countryOutlineView.addView(countryButtonLinearLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL));
             countryOutlineView.setFocusable(true);
             countryOutlineView.setContentDescription(getString(R.string.Country));
-            countryOutlineView.setOnFocusChangeListener((v, hasFocus) -> countryOutlineView.animateSelection(hasFocus ? 1 : 0));
-            addView(countryOutlineView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 60, 24, 32, 24, 12));
+            countryOutlineView.setBackground(createIosRowRipple(14, true));
+            groupCard.addView(countryOutlineView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 52));
             countryOutlineView.setOnClickListener(view -> {
                 CountrySelectActivity fragment = new CountrySelectActivity(true, countriesArray);
                 fragment.setCountrySelectActivityDelegate((country) -> {
@@ -2141,18 +2179,24 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 presentFragment(fragment);
             });
 
+            View groupDivider = new View(context);
+            groupDivider.setBackgroundColor(IOS_SEPARATOR_COLOR);
+            LinearLayout.LayoutParams groupDividerParams = new LinearLayout.LayoutParams(LayoutHelper.MATCH_PARENT, Math.max(1, AndroidUtilities.dp(0.5f)));
+            groupDividerParams.leftMargin = dp(16);
+            groupCard.addView(groupDivider, groupDividerParams);
+
             LinearLayout linearLayout = new LinearLayout(context);
             linearLayout.setOrientation(HORIZONTAL);
 
-            phoneOutlineView = new OutlineTextContainerView(context);
-            phoneOutlineView.addView(linearLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 16, 8, 16, 8));
-            phoneOutlineView.setText(getString(R.string.PhoneNumber));
-            phoneOutlineView.setFilledStyle(true);
-            addView(phoneOutlineView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 60, 24, 8, 24, 8));
+            phoneOutlineView = new IosFieldRow(context);
+            phoneOutlineView.addView(linearLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 16, 0, 16, 0));
+            groupCard.addView(phoneOutlineView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 52));
+
+            addView(groupCard, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 4, 32, 4, 0));
 
             plusTextView = new TextView(context);
             plusTextView.setText("+");
-            plusTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+            plusTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
             plusTextView.setFocusable(false);
             linearLayout.addView(plusTextView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
 
@@ -2171,7 +2215,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             codeField.setCursorSize(AndroidUtilities.dp(20));
             codeField.setCursorWidth(1.5f);
             codeField.setPadding(AndroidUtilities.dp(10), 0, 0, 0);
-            codeField.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+            codeField.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
             codeField.setMaxLines(1);
             codeField.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
             codeField.setImeOptions(EditorInfo.IME_ACTION_NEXT | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
@@ -2364,7 +2408,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             phoneField.setPadding(0, 0, 0, 0);
             phoneField.setCursorSize(AndroidUtilities.dp(20));
             phoneField.setCursorWidth(1.5f);
-            phoneField.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+            phoneField.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
             phoneField.setMaxLines(1);
             phoneField.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
             phoneField.setImeOptions(EditorInfo.IME_ACTION_NEXT | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
