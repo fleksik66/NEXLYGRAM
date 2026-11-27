@@ -2055,12 +2055,13 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             setGravity(Gravity.CENTER);
 
             titleView = new TextView(context);
-            titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 18);
+            titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 30);
             titleView.setTypeface(AndroidUtilities.bold());
             titleView.setText(getString(activityMode == MODE_CHANGE_PHONE_NUMBER ? R.string.ChangePhoneNewNumber : R.string.YourNumber));
-            titleView.setGravity(Gravity.CENTER);
+            titleView.setGravity(Gravity.LEFT);
             titleView.setLineSpacing(dp(2), 1.0f);
-            addView(titleView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 32, 0, 32, 0));
+            ThemeBind.textColor(titleView, Theme.key_windowBackgroundWhiteBlackText);
+            addView(titleView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT, 24, 0, 24, 0));
             titleView.setOnClickListener(v -> {
                 if (lastTitleToast != null) {
                     lastTitleToast.cancel();
@@ -2085,10 +2086,11 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
             subtitleView = new LinkSpanDrawable.LinksTextView(context);
             subtitleView.setText(getString(activityMode == MODE_CHANGE_PHONE_NUMBER ? R.string.ChangePhoneHelp : R.string.StartText));
-            subtitleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-            subtitleView.setGravity(Gravity.CENTER);
-            subtitleView.setLineSpacing(dp(2), 1.0f);
-            addView(subtitleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 32, 8, 32, 0));
+            subtitleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+            subtitleView.setGravity(Gravity.LEFT);
+            subtitleView.setLineSpacing(dp(3), 1.0f);
+            ThemeBind.textColor(subtitleView, Theme.key_windowBackgroundWhiteGrayText);
+            addView(subtitleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT, 24, 10, 24, 0));
 
             countryButton = new TextViewSwitcher(context);
             countryButton.setFactory(() -> {
