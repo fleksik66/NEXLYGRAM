@@ -16093,7 +16093,13 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             if (adminString != null) {
                 nameWidth -= dp(8);
             }
-            nameStringFinal = TextUtils.ellipsize(nameStringFinal, Theme.chat_namePaint, nameWidth + additionalWidth - (viaBot ? viaWidth : 0), TextUtils.TruncateAt.END);
+            String nexlyType = null;
+            if (messageObject.customName == null && needAuthorName && !viaBot && !viaGuestBot) {
+                nexlyType = currentUser != null ? org.telegram.messenger.NexlyBadges.getBadge(currentUser.id) : (currentChat != null ? org.telegram.messenger.NexlyBadges.getBadge(-currentChat.id) : null);
+            }
+            int nexlyWidth = nexlyType != null ? org.telegram.messenger.NexlyBadgeSpan.width(dp(16)) : 0;
+            nameStringFinal = TextUtils.ellipsize(nameStringFinal, Theme.chat_namePaint, Math.max(0, nameWidth + additionalWidth - (viaBot ? viaWidth : 0) - nexlyWidth), TextUtils.TruncateAt.END);
+            nameStringFinal = org.telegram.messenger.NexlyBadgeSpan.append(nameStringFinal, nexlyType, this, dp(16));
 
             if (viaGuestBot) {
                 int colorKey;
