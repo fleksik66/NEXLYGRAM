@@ -2123,6 +2123,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
             countryOutlineView = new OutlineTextContainerView(context);
             countryOutlineView.setText(getString(R.string.Country));
+            countryOutlineView.setFilledStyle(true);
             countryOutlineView.addView(countryButtonLinearLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP, 0, 0, 0, 0));
             countryOutlineView.setForceUseCenter(true);
             countryOutlineView.setFocusable(true);
@@ -2146,6 +2147,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             phoneOutlineView = new OutlineTextContainerView(context);
             phoneOutlineView.addView(linearLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 16, 8, 16, 8));
             phoneOutlineView.setText(getString(R.string.PhoneNumber));
+            phoneOutlineView.setFilledStyle(true);
             addView(phoneOutlineView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 60, 24, 8, 24, 8));
 
             plusTextView = new TextView(context);

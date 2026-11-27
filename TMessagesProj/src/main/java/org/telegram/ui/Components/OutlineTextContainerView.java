@@ -7,7 +7,6 @@ import android.graphics.RectF;
 import android.graphics.Region;
 import android.text.TextPaint;
 import android.text.TextUtils;
-import android.util.Log;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 
@@ -37,6 +36,7 @@ public class OutlineTextContainerView extends FrameLayout implements Theme.Color
         colors.add(Theme.key_text_RedBold);
         colors.add(Theme.key_windowBackgroundWhiteInputField);
         colors.add(Theme.key_windowBackgroundWhiteInputFieldActivated);
+        colors.add(Theme.key_windowBackgroundWhiteBlackText);
     }
     private final static int PADDING_LEFT = 14, PADDING_TEXT = 4;
 
@@ -69,6 +69,8 @@ public class OutlineTextContainerView extends FrameLayout implements Theme.Color
     private String mText = "";
     private final Paint outlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private final SpringAnimation selectionSpring = new SpringAnimation(this, SELECTION_PROGRESS_PROPERTY);
     private float selectionProgress;
@@ -84,6 +86,7 @@ public class OutlineTextContainerView extends FrameLayout implements Theme.Color
 
     private EditText attachedEditText;
     private boolean forceUseCenter, forceUseCenter2, forceForceUseCenter;
+    private boolean filledStyle;
 
     private final Theme.ResourcesProvider resourcesProvider;
 
@@ -100,9 +103,18 @@ public class OutlineTextContainerView extends FrameLayout implements Theme.Color
         outlinePaint.setStyle(Paint.Style.STROKE);
         outlinePaint.setStrokeCap(Paint.Cap.ROUND);
         outlinePaint.setStrokeWidth(strokeWidthRegular);
+        fillPaint.setStyle(Paint.Style.FILL);
+        strokePaint.setStyle(Paint.Style.STROKE);
+        strokePaint.setStrokeCap(Paint.Cap.ROUND);
+        strokePaint.setStrokeWidth(AndroidUtilities.dp(1.5f));
         updateColor();
 
         setPadding(0, AndroidUtilities.dp(6), 0, 0);
+    }
+
+    public void setFilledStyle(boolean filledStyle) {
+        this.filledStyle = filledStyle;
+        invalidate();
     }
 
     public void setForceUseCenter2(boolean forceUseCenter2) {
@@ -218,7 +230,48 @@ public class OutlineTextContainerView extends FrameLayout implements Theme.Color
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         applyThemeColorsOnDraw();
+        if (filledStyle) {
+            drawFilled(canvas);
+        } else {
+            drawOutlined(canvas);
+        }
+    }
 
+    private void drawFilled(Canvas canvas) {
+        float left = getPaddingLeft();
+        float top = getPaddingTop();
+        float right = getWidth() - getPaddingRight();
+        float bottom = getHeight() - getPaddingBottom();
+        float radius = AndroidUtilities.dp(12);
+
+        fillPaint.setColor(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider), 0x14));
+        rect.set(left, top, right, bottom);
+        canvas.drawRoundRect(rect, radius, radius, fillPaint);
+
+        float borderAlpha = Math.min(1f, selectionProgress + errorProgress);
+        if (borderAlpha > 0.01f) {
+            strokePaint.setColor(outlinePaint.getColor());
+            strokePaint.setAlpha(Math.round(255 * borderAlpha));
+            float inset = strokePaint.getStrokeWidth() / 2f;
+            rect.set(left + inset, top + inset, right - inset, bottom - inset);
+            canvas.drawRoundRect(rect, radius, radius, strokePaint);
+        }
+
+        boolean useCenter = attachedEditText != null && attachedEditText.length() == 0 && TextUtils.isEmpty(attachedEditText.getHint()) || forceUseCenter || forceUseCenter2;
+        float t = useCenter ? titleProgress : 1f;
+        float centerY = (top + bottom) / 2f + textPaint.getTextSize() / 2f - AndroidUtilities.dp(1);
+        float floatingY = top + AndroidUtilities.dp(18);
+        float baseY = centerY + (floatingY - centerY) * t;
+        float scale = 1f + (0.75f - 1f) * t;
+        float x = left + AndroidUtilities.dp(16);
+
+        canvas.save();
+        canvas.scale(scale, scale, x, baseY);
+        canvas.drawText(mText, x, baseY, textPaint);
+        canvas.restore();
+    }
+
+    private void drawOutlined(Canvas canvas) {
         float textOffset = textPaint.getTextSize() / 2f - AndroidUtilities.dp(1.75f);
         float topY = getPaddingTop() + textOffset;
         float centerY = getHeight() / 2f + textPaint.getTextSize() / 2f;
