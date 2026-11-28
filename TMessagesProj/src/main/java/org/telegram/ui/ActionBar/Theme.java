@@ -9122,7 +9122,152 @@ public class Theme {
         return getColor(key, isDefault, false);
     }
 
+    // ======================= black & white filter for dark themes =======================
+    /** Set to false to get the original dark palettes back. */
+    public static final boolean MONOCHROME_DARK = true;
+
+    private static final byte MONO_UNSET = 0, MONO_GENERIC = 1, MONO_KEEP = 2, MONO_FIXED = 3;
+    private static byte[] monoRole;
+    private static int[] monoFixed;
+    private static long[] monoCache;
+
+    private static void monoResolveRole(int key) {
+        String name;
+        try {
+            name = ThemeColors.getStringName(key);
+        } catch (Throwable t) {
+            name = null;
+        }
+        byte role = MONO_GENERIC;
+        int fixed = 0;
+        if (name != null) {
+            switch (name) {
+                // main backgrounds: pure black
+                case "windowBackgroundWhite":
+                case "windowBackgroundGray":
+                case "actionBarDefault":
+                case "actionBarDefaultArchived":
+                case "chats_menuBackground":
+                case "dialogBackgroundGray":
+                case "chat_messagePanelBackground":
+                    role = MONO_FIXED; fixed = 0xFF000000; break;
+                // raised surfaces: dialogs, popup menus, incoming bubbles
+                case "dialogBackground":
+                case "actionBarDefaultSubmenuBackground":
+                case "chat_inBubble":
+                    role = MONO_FIXED; fixed = 0xFF1C1C1E; break;
+                case "chat_inBubbleSelected":
+                    role = MONO_FIXED; fixed = 0xFF2C2C2E; break;
+                // outgoing bubbles: neutral gray, white text stays readable
+                case "chat_outBubble":
+                case "chat_outBubbleSelected":
+                case "chat_outBubbleGradient":
+                case "chat_outBubbleGradient2":
+                case "chat_outBubbleGradient3":
+                    role = MONO_FIXED; fixed = 0xFF3A3A3C; break;
+                // glyphs that sit on an accent (now white) background
+                case "chats_actionIcon":
+                case "chats_unreadCounterText":
+                case "featuredStickers_buttonText":
+                case "checkboxCheck":
+                case "checkboxSquareCheck":
+                case "dialogRoundCheckBoxCheck":
+                case "switchTrackBlueThumbChecked":
+                case "profile_actionIcon":
+                case "chat_goDownButtonIcon":
+                    role = MONO_FIXED; fixed = 0xFF000000; break;
+                default:
+                    if (name.startsWith("avatar_") || name.startsWith("chat_wallpaper") || name.startsWith("premiumGradient")) {
+                        role = MONO_KEEP;
+                    }
+            }
+        }
+        monoFixed[key] = fixed;
+        monoRole[key] = role;
+    }
+
+    private static int monoGeneric(int color) {
+        final int a = color >>> 24;
+        if (a == 0) {
+            return color;
+        }
+        final int r = (color >> 16) & 255, g = (color >> 8) & 255, b = color & 255;
+        final int max = Math.max(r, Math.max(g, b)), min = Math.min(r, Math.min(g, b));
+        final float v = max / 255f;
+        final float s = max == 0 ? 0f : (max - min) / (float) max;
+        if (s < 0.12f) {
+            return color; // already neutral
+        }
+        float h;
+        final float d = max - min;
+        if (max == r) {
+            h = ((g - b) / d) % 6f;
+        } else if (max == g) {
+            h = (b - r) / d + 2f;
+        } else {
+            h = (r - g) / d + 4f;
+        }
+        h *= 60f;
+        if (h < 0) {
+            h += 360f;
+        }
+        if ((h < 22f || h > 338f) && s > 0.45f && v > 0.45f) {
+            return color; // keep red: errors, destructive actions
+        }
+        if (s >= 0.45f && v >= 0.5f) {
+            return (a << 24) | 0xFFFFFF; // brand accents -> white
+        }
+        final float lum = (0.299f * r + 0.587f * g + 0.114f * b) / 255f;
+        final float gray = v < 0.35f ? v * 0.55f : lum; // dark navy surfaces -> near-black, mid tones keep their brightness
+        final int gv = Math.round(Math.max(0f, Math.min(1f, gray)) * 255f);
+        return (a << 24) | (gv << 16) | (gv << 8) | gv;
+    }
+
+    private static int applyMonochrome(int key, int color) {
+        if (key < 0 || key >= colorsCount) {
+            return color;
+        }
+        if (monoRole == null) {
+            synchronized (Theme.class) {
+                if (monoRole == null) {
+                    monoFixed = new int[colorsCount];
+                    monoCache = new long[colorsCount];
+                    monoRole = new byte[colorsCount];
+                }
+            }
+        }
+        byte role = monoRole[key];
+        if (role == MONO_UNSET) {
+            monoResolveRole(key);
+            role = monoRole[key];
+        }
+        if (role == MONO_KEEP) {
+            return color;
+        }
+        if (role == MONO_FIXED) {
+            return monoFixed[key];
+        }
+        if ((color >>> 24) == 0) {
+            return color;
+        }
+        final long cached = monoCache[key];
+        if (cached != 0 && (int) (cached >>> 32) == color) {
+            return (int) cached;
+        }
+        final int out = monoGeneric(color);
+        monoCache[key] = ((color & 0xFFFFFFFFL) << 32) | (out & 0xFFFFFFFFL);
+        return out;
+    }
+
     public static int getColor(int key, boolean[] isDefault, boolean ignoreAnimation) {
+        final int color = getColorUnfiltered(key, isDefault, ignoreAnimation);
+        if (MONOCHROME_DARK && currentTheme != null && currentTheme.isDark()) {
+            return applyMonochrome(key, color);
+        }
+        return color;
+    }
+
+    private static int getColorUnfiltered(int key, boolean[] isDefault, boolean ignoreAnimation) {
         if (SharedConfig.compactMode) {
             // compact mode swaps some message colors for its own keys, see getCompactColor
             final Integer compactColor = getCompactColor(key, null);
