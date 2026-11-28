@@ -664,7 +664,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 super.onLayout(changed, left, top, right, bottom);
                 for (SlideView slideView : views) {
                     MarginLayoutParams params = (MarginLayoutParams) slideView.getLayoutParams();
-                    int childBottom = getHeight() + AndroidUtilities.dp(16);
+                    int childBottom = getHeight() + AndroidUtilities.dp(16) - AndroidUtilities.dp(64);
                     if (!slideView.hasCustomKeyboard() && keyboardView.getVisibility() == VISIBLE) {
                         childBottom += AndroidUtilities.dp(CustomPhoneKeyboardView.KEYBOARD_HEIGHT_DP);
                     }
@@ -679,7 +679,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
                 for (SlideView slideView : views) {
                     MarginLayoutParams params = (MarginLayoutParams) slideView.getLayoutParams();
-                    int childHeight = height - params.topMargin + AndroidUtilities.dp(16);
+                    int childHeight = height - params.topMargin + AndroidUtilities.dp(16) - AndroidUtilities.dp(64);
                     if (!slideView.hasCustomKeyboard() && keyboardView.getVisibility() == VISIBLE) {
                         childHeight += AndroidUtilities.dp(CustomPhoneKeyboardView.KEYBOARD_HEIGHT_DP);
                     }
@@ -752,10 +752,17 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         }
 
         floatingButton = new FragmentFloatingButton(context, resourceProvider);
+        floatingButton.setPillMode(getString(R.string.Continue), IOS_BUTTON_RADIUS);
+        applyPillTheme(floatingButton);
         floatingButton.setButtonVisible(doneButtonVisible[DONE_TYPE_FLOATING], false);
         floatingAutoAnimator = VerticalPositionAutoAnimator.attach(floatingButton);
-        sizeNotifierFrameLayout.addView(floatingButton, FragmentFloatingButton.createDefaultLayoutParamsBig());
-        floatingButton.setOnClickListener(view -> onDoneButtonPressed());
+        sizeNotifierFrameLayout.addView(floatingButton, FragmentFloatingButton.createPillLayoutParams());
+        floatingButton.setOnClickListener(view -> {
+            try {
+                view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
+            } catch (Exception ignored) {}
+            onDoneButtonPressed();
+        });
         floatingAutoAnimator.addUpdateListener((animation, value, velocity) -> {
             if (phoneNumberConfirmView != null) {
                 phoneNumberConfirmView.updateFabPosition();
@@ -781,7 +788,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             emailChangeSkipButton.setLineSpacing(AndroidUtilities.dp(2), 1.0f);
             emailChangeSkipButton.setPadding(AndroidUtilities.dp(16), 0, AndroidUtilities.dp(16), 0);
             emailChangeSkipButton.setText(getString(R.string.YourEmailSkip));
-            ThemeBind.textColor(emailChangeSkipButton, Theme.key_windowBackgroundWhiteBlueText4);
+            emailChangeSkipButton.setTextColor(loginAccent());
             sizeNotifierFrameLayout.addView(emailChangeSkipButton, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, 30, Gravity.TOP | Gravity.RIGHT, 0, 16, 16, 0));
             emailChangeSkipButton.setOnClickListener(v -> {
                 if (emailChangeSkipCallback != null) {
@@ -811,8 +818,8 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         floatingButtonIcon.setProgress(1f);
         floatingButtonIcon.setDrawBackground(false);
         floatingButton.setContentDescription(getString(R.string.Done));
-        floatingButton.addView(floatingButtonIcon, LayoutHelper.createFrame(56, 56, Gravity.CENTER));
-        floatingButton.addAdditionalView(floatingButtonIcon);
+        // pill mode: the arrow icon is not shown, but the view is kept because other code touches it
+        floatingButtonIcon.setLayoutParams(LayoutHelper.createFrame(56, 56, Gravity.CENTER));
 
         if (savedInstanceState != null) {
             restoringState = true;
@@ -1201,6 +1208,9 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
         } catch (Exception ignored) {}
         AndroidUtilities.shakeViewSpring(view, 3.5f);
+        if (view instanceof IosFieldRow) {
+            ((IosFieldRow) view).flashError();
+        }
 
         if (allowErrorSelection) {
             if (view instanceof OutlineTextContainerView) {
@@ -1531,6 +1541,9 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     }
 
     public void setPage(@ViewNumber int page, boolean animated, Bundle params, boolean back) {
+        if (floatingButton != null) {
+            floatingButton.setPillActive(true, false);
+        }
         boolean needFloatingButton = page == VIEW_PHONE_INPUT || page == VIEW_REGISTER || page == VIEW_PASSWORD ||
                 page == VIEW_NEW_PASSWORD_STAGE_1 || page == VIEW_NEW_PASSWORD_STAGE_2 || page == VIEW_ADD_EMAIL || page == VIEW_CODE_PHRASE || page == VIEW_CODE_WORD;
         if (page == currentViewNum) {
@@ -1993,12 +2006,41 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     private TLRPC.TL_help_termsOfService currentTermsOfService;
 
     // ---- iOS-style helpers for the phone screen ----
-    private static final int IOS_GROUP_COLOR = 0xFF1C1C1E;
-    private static final int IOS_SEPARATOR_COLOR = 0xFF38383A;
+    private static final int IOS_CARD_RADIUS = 12;
+    private static final int IOS_BUTTON_RADIUS = 10;
+
+    private static int iosGroupColor() {
+        return Theme.isCurrentThemeDark() ? 0xFF1C1C1E : 0xFFF2F2F7;
+    }
+
+    private static int iosSeparatorColor() {
+        return Theme.isCurrentThemeDark() ? 0xFF38383A : 0xFFC6C6C8;
+    }
+
+    /** Pure black on dark themes, the normal window colour otherwise. */
+    private static int loginBackground() {
+        return Theme.isCurrentThemeDark() ? 0xFF000000 : Theme.getColor(Theme.key_windowBackgroundWhite);
+    }
+
+    /** Replaces Telegram blue for links / spinners / cursors on the login screens. */
+    private static int loginAccent() {
+        return Theme.isCurrentThemeDark() ? 0xFFFFFFFF : 0xFF000000;
+    }
+
+    private static void applyPillTheme(FragmentFloatingButton button) {
+        if (button == null) {
+            return;
+        }
+        if (Theme.isCurrentThemeDark()) {
+            button.setPillColors(0xFFFFFFFF, 0xFFD1D1D6, 0xFF000000, 0xFF1C1C1E, 0xFF636366);
+        } else {
+            button.setPillColors(0xFF000000, 0xFF3A3A3C, 0xFFFFFFFF, 0xFFE5E5EA, 0xFFAEAEB2);
+        }
+    }
 
     private static GradientDrawable createIosGroupBackground(float radiusDp) {
         GradientDrawable d = new GradientDrawable();
-        d.setColor(IOS_GROUP_COLOR);
+        d.setColor(iosGroupColor());
         d.setCornerRadius(dp(radiusDp));
         return d;
     }
@@ -2013,13 +2055,120 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
     /** Flat row inside the grouped card. Keeps animateSelection/updateColor so PhoneView code stays unchanged. */
     private static class IosFieldRow extends FrameLayout {
+        private final Paint errorPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path errorPath = new Path();
+        private final RectF errorRect = new RectF();
+        private float errorProgress;
+        private float topRadiusDp, bottomRadiusDp;
+        private ValueAnimator errorAnimator;
+
         public IosFieldRow(Context context) {
             super(context);
         }
+
         public void animateSelection(float value) {
             // iOS has no focus ring - intentionally empty
         }
+
         public void updateColor() {
+        }
+
+        /** Corner radii of the card this row sits in (so the error tint follows the rounded corners). */
+        public void setCorners(float topDp, float bottomDp) {
+            topRadiusDp = topDp;
+            bottomRadiusDp = bottomDp;
+        }
+
+        /** Soft red tint that fades in and out. */
+        public void flashError() {
+            if (errorAnimator != null) {
+                errorAnimator.cancel();
+            }
+            errorAnimator = ValueAnimator.ofFloat(0f, 1f, 0f);
+            errorAnimator.setDuration(900);
+            errorAnimator.addUpdateListener(a -> {
+                errorProgress = (float) a.getAnimatedValue();
+                invalidate();
+            });
+            errorAnimator.start();
+        }
+
+        @Override
+        protected void dispatchDraw(Canvas canvas) {
+            if (errorProgress > 0.001f) {
+                errorPaint.setColor(0xFFFF453A);
+                errorPaint.setAlpha((int) (70 * errorProgress));
+                errorRect.set(0, 0, getWidth(), getHeight());
+                final float t = dp(topRadiusDp), b = dp(bottomRadiusDp);
+                errorPath.reset();
+                errorPath.addRoundRect(errorRect, new float[]{t, t, t, t, b, b, b, b}, Path.Direction.CW);
+                canvas.drawPath(errorPath, errorPaint);
+            }
+            super.dispatchDraw(canvas);
+        }
+
+        @Override
+        protected void onDetachedFromWindow() {
+            super.onDetachedFromWindow();
+            if (errorAnimator != null) {
+                errorAnimator.cancel();
+                errorAnimator = null;
+                errorProgress = 0f;
+            }
+        }
+    }
+
+    /** Staggered fade + slide-up used when an iOS-style screen appears. */
+    private static void playIosEnter(View... views) {
+        int order = 0;
+        for (View v : views) {
+            if (v == null) {
+                continue;
+            }
+            v.animate().cancel();
+            v.setAlpha(0f);
+            v.setTranslationY(dp(16));
+            v.animate().alpha(1f).translationY(0f).setStartDelay(70L * order).setDuration(420)
+                    .setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+            order++;
+        }
+    }
+
+    /** White circle with a black paper plane, matches the white "Continue" pill. */
+    private static class IosLoginLogoView extends View {
+        private final Paint circlePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint planePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path planePath = new Path();
+        private static final float[][] PLANE = {{88, 14}, {12, 43}, {30, 51}, {70, 25}, {40, 56}, {40, 80}, {54, 66}, {70, 78}};
+
+        public IosLoginLogoView(Context context) {
+            super(context);
+            circlePaint.setColor(Theme.isCurrentThemeDark() ? 0xFFFFFFFF : 0xFF000000);
+            planePaint.setColor(Theme.isCurrentThemeDark() ? 0xFF000000 : 0xFFFFFFFF);
+            planePaint.setPathEffect(new android.graphics.CornerPathEffect(dp(1.2f)));
+        }
+
+        @Override
+        protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+            super.onSizeChanged(w, h, oldw, oldh);
+            planePath.reset();
+            final float sc = 0.56f, off = 22f, k = Math.min(w, h) / 100f;
+            for (int i = 0; i < PLANE.length; i++) {
+                final float x = (off + PLANE[i][0] * sc) * k, y = (off + PLANE[i][1] * sc) * k;
+                if (i == 0) {
+                    planePath.moveTo(x, y);
+                } else {
+                    planePath.lineTo(x, y);
+                }
+            }
+            planePath.close();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            final float r = Math.min(getWidth(), getHeight()) / 2f;
+            canvas.drawCircle(getWidth() / 2f, getHeight() / 2f, r, circlePaint);
+            canvas.drawPath(planePath, planePaint);
         }
     }
 
@@ -2084,11 +2233,18 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
         public PhoneView(Context context) {
             super(context);
-            setBackgroundColor(0xFF000000);
+            setBackgroundColor(loginBackground());
 
             setOrientation(VERTICAL);
             setGravity(Gravity.LEFT);
             setPadding(0, dp(72), 0, dp(24));
+
+            IosLoginLogoView logoView = null;
+            if (activityMode == MODE_LOGIN && !AndroidUtilities.isSmallScreen()) {
+                setPadding(0, dp(36), 0, dp(24));
+                logoView = new IosLoginLogoView(context);
+                addView(logoView, LayoutHelper.createLinear(88, 88, Gravity.CENTER_HORIZONTAL, 0, 0, 0, 20));
+            }
 
             titleView = new TextView(context);
             titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 28);
@@ -2160,13 +2316,14 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             // iOS-style grouped card: [country row] / hairline / [phone row]
             LinearLayout groupCard = new LinearLayout(context);
             groupCard.setOrientation(VERTICAL);
-            groupCard.setBackground(createIosGroupBackground(14));
+            groupCard.setBackground(createIosGroupBackground(IOS_CARD_RADIUS));
 
             countryOutlineView = new IosFieldRow(context);
             countryOutlineView.addView(countryButtonLinearLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL));
             countryOutlineView.setFocusable(true);
             countryOutlineView.setContentDescription(getString(R.string.Country));
-            countryOutlineView.setBackground(createIosRowRipple(14, true));
+            countryOutlineView.setBackground(createIosRowRipple(IOS_CARD_RADIUS, true));
+            countryOutlineView.setCorners(IOS_CARD_RADIUS, 0);
             groupCard.addView(countryOutlineView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 52));
             countryOutlineView.setOnClickListener(view -> {
                 CountrySelectActivity fragment = new CountrySelectActivity(true, countriesArray);
@@ -2180,7 +2337,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             });
 
             View groupDivider = new View(context);
-            groupDivider.setBackgroundColor(IOS_SEPARATOR_COLOR);
+            groupDivider.setBackgroundColor(iosSeparatorColor());
             LinearLayout.LayoutParams groupDividerParams = new LinearLayout.LayoutParams(LayoutHelper.MATCH_PARENT, Math.max(1, AndroidUtilities.dp(0.5f)));
             groupDividerParams.leftMargin = dp(16);
             groupCard.addView(groupDivider, groupDividerParams);
@@ -2189,10 +2346,12 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             linearLayout.setOrientation(HORIZONTAL);
 
             phoneOutlineView = new IosFieldRow(context);
+            phoneOutlineView.setCorners(0, IOS_CARD_RADIUS);
             phoneOutlineView.addView(linearLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 16, 0, 16, 0));
             groupCard.addView(phoneOutlineView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 52));
 
             addView(groupCard, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 4, 32, 4, 0));
+            playIosEnterAnimation(logoView, titleView, subtitleView, groupCard);
 
             plusTextView = new TextView(context);
             plusTextView.setText("+");
@@ -2345,6 +2504,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                             phoneField.setSelection(phoneField.length());
                         }
                     }
+                    updateContinueState(true);
                     ignoreOnTextChange = false;
                 }
             });
@@ -2525,6 +2685,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                     }
                     phoneField.onTextChange();
                     invalidateCountryHint();
+                    updateContinueState(true);
                     ignoreOnPhoneChange = false;
                 }
             });
@@ -2668,6 +2829,56 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             loadCountries();
         }
 
+        private boolean iosEnterPlayed;
+
+        private void playIosEnterAnimation(View... views) {
+            if (iosEnterPlayed) {
+                return;
+            }
+            iosEnterPlayed = true;
+            int order = 0;
+            for (View v : views) {
+                if (v == null) {
+                    continue;
+                }
+                v.setAlpha(0f);
+                if (v instanceof IosLoginLogoView) {
+                    v.setScaleX(0.7f);
+                    v.setScaleY(0.7f);
+                    v.animate().alpha(1f).scaleX(1f).scaleY(1f).setStartDelay(60).setDuration(520)
+                            .setInterpolator(new android.view.animation.OvershootInterpolator(1.25f)).start();
+                } else {
+                    v.setTranslationY(dp(16));
+                    v.animate().alpha(1f).translationY(0f).setStartDelay(90L * (order + 1)).setDuration(420)
+                            .setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT).start();
+                }
+                order++;
+            }
+        }
+
+        private boolean isPhoneNumberComplete() {
+            if (codeField == null || phoneField == null || codeField.length() == 0 || countryState == COUNTRY_STATE_INVALID) {
+                return false;
+            }
+            final String digits = phoneField.getText() == null ? "" : PhoneFormat.stripExceptNumbers(phoneField.getText().toString());
+            final List<String> patterns = phoneFormatMap.get(codeField.getText().toString());
+            int need = 6;
+            if (patterns != null && !patterns.isEmpty()) {
+                need = Integer.MAX_VALUE;
+                for (String pattern : patterns) {
+                    need = Math.min(need, pattern.replace(" ", "").length());
+                }
+            }
+            return digits.length() >= need;
+        }
+
+        private void updateContinueState(boolean animated) {
+            if (floatingButton == null) {
+                return;
+            }
+            floatingButton.setPillActive(isPhoneNumberComplete(), animated);
+        }
+
         private void loadCountries() {
             TLRPC.TL_help_getCountriesList req = new TLRPC.TL_help_getCountriesList();
             req.lang_code = LocaleController.getInstance().getCurrentLocaleInfo() != null ? LocaleController.getInstance().getCurrentLocaleInfo().getLangCode() : Locale.getDefault().getCountry();
@@ -2771,20 +2982,20 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             plusTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
 
             codeField.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
-            codeField.setCursorColor(Theme.getColor(Theme.key_windowBackgroundWhiteInputFieldActivated));
+            codeField.setCursorColor(loginAccent());
 
             codeDividerView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhiteInputField));
 
             phoneField.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
             phoneField.setHintTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteHintText));
-            phoneField.setCursorColor(Theme.getColor(Theme.key_windowBackgroundWhiteInputFieldActivated));
+            phoneField.setCursorColor(loginAccent());
 
             if (syncContactsBox != null) {
-                syncContactsBox.setSquareCheckBoxColor(Theme.key_checkboxSquareUnchecked, Theme.key_checkboxSquareBackground, Theme.key_checkboxSquareCheck);
+                syncContactsBox.setSquareCheckBoxColor(Theme.key_checkboxSquareUnchecked, Theme.key_windowBackgroundWhiteBlackText, Theme.key_windowBackgroundWhite);
                 syncContactsBox.updateTextColor();
             }
             if (testBackendCheckBox != null) {
-                testBackendCheckBox.setSquareCheckBoxColor(Theme.key_checkboxSquareUnchecked, Theme.key_checkboxSquareBackground, Theme.key_checkboxSquareCheck);
+                testBackendCheckBox.setSquareCheckBoxColor(Theme.key_checkboxSquareUnchecked, Theme.key_windowBackgroundWhiteBlackText, Theme.key_windowBackgroundWhite);
                 testBackendCheckBox.updateTextColor();
             }
 
@@ -3457,6 +3668,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         public void onShow() {
             super.onShow();
             fillNumber();
+            updateContinueState(false);
             if (syncContactsBox != null) {
                 syncContactsBox.setChecked(syncContacts, false);
             }
@@ -3959,6 +4171,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                         onNextPressed(null);
                     }
                 };
+                codeFieldContainer.setIosStyle(true);
 
                 LinearLayout linearLayout = new LinearLayout(context);
                 linearLayout.setOrientation(LinearLayout.HORIZONTAL);
@@ -4038,8 +4251,9 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                         onNextPressed(null);
                     }
                 };
+                codeFieldContainer.setIosStyle(true);
 
-                addView(codeFieldContainer, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 42, Gravity.CENTER_HORIZONTAL, 0, 32, 0, 0));
+                addView(codeFieldContainer, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 52, Gravity.CENTER_HORIZONTAL, 0, 32, 0, 0));
             }
             if (currentType == AUTH_TYPE_FLASH_CALL) {
                 codeFieldContainer.setVisibility(GONE);
@@ -4377,13 +4591,13 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         @Override
         public void updateColors() {
             confirmTextView.setTextColor(Theme.getColor(isInCancelAccountDeletionMode() ? Theme.key_windowBackgroundWhiteBlackText : Theme.key_windowBackgroundWhiteGrayText6));
-            confirmTextView.setLinkTextColor(Theme.getColor(Theme.key_chats_actionBackground));
+            confirmTextView.setLinkTextColor(loginAccent());
             titleTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
 
             if (currentType == AUTH_TYPE_MISSED_CALL) {
                 missedCallDescriptionSubtitle.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
                 missedCallDescriptionSubtitle2.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
-                missedCallArrowIconColor = applyColorFilter(missedCallArrowIcon, Theme.getColor(Theme.key_windowBackgroundWhiteInputFieldActivated), missedCallArrowIconColor, PorterDuff.Mode.SRC_IN);
+                missedCallArrowIconColor = applyColorFilter(missedCallArrowIcon, loginAccent(), missedCallArrowIconColor, PorterDuff.Mode.SRC_IN);
                 missedCallPhoneIconColor = applyColorFilter(missedCallPhoneIcon, Theme.getColor(Theme.key_windowBackgroundWhiteBlackText), missedCallPhoneIconColor, PorterDuff.Mode.SRC_IN);
                 prefixTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
             }
@@ -4404,14 +4618,14 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             timeText.setTextColor(Theme.getColor(timeTextColorTag));
 
             if (currentType != AUTH_TYPE_FRAGMENT_SMS) {
-                problemText.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
+                problemText.setTextColor(loginAccent());
             }
             wrongCode.setTextColor(Theme.getColor(Theme.key_text_RedBold));
         }
 
         private void applyLottieColors(RLottieDrawable drawable) {
             if (drawable != null) {
-                drawable.setLayerColor("Bubble", Theme.getColor(Theme.key_chats_actionBackground));
+                drawable.setLayerColor("Bubble", 0xFF636366);
                 drawable.setLayerColor("Phone", Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
                 drawable.setLayerColor("Note", Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
             }
@@ -4941,8 +5155,8 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                                 } else {
                                     timeText.setText(getString("RequestSmsButton", R.string.RequestSmsButton));
                                 }
-                                ThemeBind.textColor(timeText, Theme.key_chats_actionBackground);
-                                timeText.setTag(R.id.color_key_tag, Theme.key_chats_actionBackground);
+                                timeText.setTextColor(loginAccent());
+                                timeText.setTag(R.id.color_key_tag, Theme.key_windowBackgroundWhiteBlackText);
                             }
                         }
                     });
@@ -5681,6 +5895,8 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             addView(confirmTextView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 12, 8, 12, 0));
 
             outlineCodeField = new OutlineTextContainerView(context);
+            outlineCodeField.setMonochrome(true);
+            outlineCodeField.setFilledStyle(true);
             outlineCodeField.setText(getString(R.string.EnterPassword));
             codeField = new EditTextBoldCursor(context);
             codeField.setCursorSize(AndroidUtilities.dp(20));
@@ -5795,7 +6011,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             codeField.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
             codeField.setCursorColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
             codeField.setHintTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteHintText));
-            cancelButton.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
+            cancelButton.setTextColor(loginAccent());
             outlineCodeField.updateColor();
         }
 
@@ -6254,6 +6470,8 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             addView(subtitleView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 32, 8, 32, 0));
 
             emailOutlineView = new OutlineTextContainerView(context);
+            emailOutlineView.setMonochrome(true);
+            emailOutlineView.setFilledStyle(true);
             emailOutlineView.setText(getString(activityMode == MODE_CHANGE_LOGIN_EMAIL ? R.string.YourNewEmail : R.string.YourEmail));
 
             emailField = new EditTextBoldCursor(context);
@@ -6354,7 +6572,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             subtitleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText6));
             subtitleView.setLinkTextColor(Theme.getColor(Theme.key_chat_messageLinkIn));
             emailField.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
-            signInWithGoogleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
+            signInWithGoogleView.setTextColor(loginAccent());
             loginOrView.updateColors();
 
             emailOutlineView.invalidate();
@@ -6623,8 +6841,9 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                     onNextPressed(null);
                 }
             };
+            codeFieldContainer.setIosStyle(true);
 
-            addView(codeFieldContainer, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 42, Gravity.CENTER_HORIZONTAL, 0, setup ? 48 : 32, 0, 0));
+            addView(codeFieldContainer, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 52, Gravity.CENTER_HORIZONTAL, 0, setup ? 48 : 32, 0, 0));
 
             signInWithGoogleView = new TextView(context);
             signInWithGoogleView.setGravity(Gravity.CENTER);
@@ -6880,10 +7099,10 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         public void updateColors() {
             titleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
             confirmTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText6));
-            signInWithGoogleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
+            signInWithGoogleView.setTextColor(loginAccent());
             loginOrView.updateColors();
-            resendCodeView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
-            cantAccessEmailView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
+            resendCodeView.setTextColor(loginAccent());
+            cantAccessEmailView.setTextColor(loginAccent());
             emailResetInView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText6));
             wrongCodeView.setTextColor(Theme.getColor(Theme.key_text_RedBold));
 
@@ -7080,7 +7299,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             if (startIndex != endIndex && startIndex != -1 && endIndex != -1) {
                 ssb.replace(endIndex, endIndex + 1, "");
                 ssb.replace(startIndex, startIndex + 1, "");
-                ssb.setSpan(new ForegroundColorSpanThemable(Theme.key_windowBackgroundWhiteBlueText4, LoginActivity.this.getResourceProvider()), startIndex, endIndex - 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                ssb.setSpan(new ForegroundColorSpan(loginAccent()), startIndex, endIndex - 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
 
             emailResetInView.setText(ssb);
@@ -7428,6 +7647,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                     onNextPressed(null);
                 }
             };
+            codeFieldContainer.setIosStyle(true);
             codeFieldContainer.setNumbersCount(6, AUTH_TYPE_MESSAGE);
             for (CodeNumberField f : codeFieldContainer.codeField) {
                 f.setShowSoftInputOnFocusCompat(!(hasCustomKeyboard() && !isCustomKeyboardForceDisabled()));
@@ -7454,7 +7674,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 });
             }
 
-            addView(codeFieldContainer, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 42, Gravity.CENTER_HORIZONTAL, 0, 32, 0, 0));
+            addView(codeFieldContainer, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 52, Gravity.CENTER_HORIZONTAL, 0, 32, 0, 0));
 
             troubleButton = new SpoilersTextView(context, false);
             troubleButton.setGravity(Gravity.CENTER);
@@ -7486,7 +7706,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         public void updateColors() {
             titleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
             confirmTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText6));
-            troubleButton.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
+            troubleButton.setTextColor(loginAccent());
 
             codeFieldContainer.invalidate();
         }
@@ -7712,6 +7932,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
             for (int a = 0; a < codeField.length; a++) {
                 OutlineTextContainerView outlineField = new OutlineTextContainerView(context);
+                outlineField.setMonochrome(true);
                 outlineFields[a] = outlineField;
                 outlineField.setText(getString(stage == 0 ? a == 0 ? R.string.PleaseEnterNewFirstPasswordHint : R.string.PleaseEnterNewSecondPasswordHint : R.string.PasswordHintPlaceholder));
 
@@ -7832,12 +8053,12 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             confirmTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText6));
             for (EditTextBoldCursor editText : codeField) {
                 editText.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
-                editText.setCursorColor(Theme.getColor(Theme.key_windowBackgroundWhiteInputFieldActivated));
+                editText.setCursorColor(loginAccent());
             }
             for (OutlineTextContainerView outlineField : outlineFields) {
                 outlineField.updateColor();
             }
-            cancelButton.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
+            cancelButton.setTextColor(loginAccent());
             if (passwordButton != null) {
                 passwordButtonFilterColor = applyColorFilter(passwordButton, Theme.getColor(isPasswordVisible ? Theme.key_windowBackgroundWhiteInputFieldActivated : Theme.key_windowBackgroundWhiteHintText), passwordButtonFilterColor, PorterDuff.Mode.SRC_ATOP);
                 passwordButtonSelectorColor = applySelectorBackground(passwordButton, getThemedColor(Theme.key_listSelector), passwordButtonSelectorColor, 1);
@@ -8039,7 +8260,9 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     }
 
     public class LoginActivityRegisterView extends SlideView implements ImageUpdater.ImageUpdaterDelegate {
-        private OutlineTextContainerView firstNameOutlineView, lastNameOutlineView;
+        private IosFieldRow firstNameOutlineView, lastNameOutlineView;
+        private FrameLayout avatarContainerView;
+        private GradientDrawable avatarPlaceholder;
 
         private EditTextBoldCursor firstNameField;
         private EditTextBoldCursor lastNameField;
@@ -8075,7 +8298,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             @Override
             public void updateDrawState(TextPaint ds) {
                 super.updateDrawState(ds);
-                ds.setUnderlineText(false);
+                ds.setUnderlineText(true);
             }
 
             @Override
@@ -8134,7 +8357,13 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             imageUpdater.setDelegate(this);
 
             FrameLayout avatarContainer = new FrameLayout(context);
-            addView(avatarContainer, LayoutHelper.createLinear(78, 78, Gravity.CENTER_HORIZONTAL));
+            avatarContainerView = avatarContainer;
+            addView(avatarContainer, LayoutHelper.createLinear(96, 96, Gravity.CENTER_HORIZONTAL));
+
+            avatarPlaceholder = new GradientDrawable();
+            avatarPlaceholder.setShape(GradientDrawable.OVAL);
+            avatarPlaceholder.setColor(0xFF1C1C1E);
+            avatarPlaceholder.setStroke(Math.max(1, AndroidUtilities.dp(1)), 0x26FFFFFF);
 
             avatarDrawable = new AvatarDrawable();
 
@@ -8158,15 +8387,29 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             avatarImage.setRoundRadius(AndroidUtilities.dp(64));
             avatarDrawable.setAvatarType(AvatarDrawable.AVATAR_TYPE_REGISTER);
             avatarDrawable.setInfo(5, null, null);
-            avatarImage.setImageDrawable(avatarDrawable);
+            avatarImage.setImageDrawable(avatarPlaceholder);
             avatarContainer.addView(avatarImage, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
             Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
             paint.setColor(0x55000000);
+            final Paint badgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            badgePaint.setColor(0xFFFFFFFF);
+            final Paint plusPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            plusPaint.setColor(0xFF000000);
+            plusPaint.setStyle(Paint.Style.STROKE);
+            plusPaint.setStrokeCap(Paint.Cap.ROUND);
+            plusPaint.setStrokeWidth(AndroidUtilities.dp(2));
 
             avatarOverlay = new View(context) {
                 @Override
                 protected void onDraw(Canvas canvas) {
+                    if (avatar == null) {
+                        // "add photo" badge in the corner, white on the dark avatar
+                        final float bx = getMeasuredWidth() - AndroidUtilities.dp(14), by = getMeasuredHeight() - AndroidUtilities.dp(14);
+                        canvas.drawCircle(bx, by, AndroidUtilities.dp(13), badgePaint);
+                        canvas.drawLine(bx - AndroidUtilities.dp(5), by, bx + AndroidUtilities.dp(5), by, plusPaint);
+                        canvas.drawLine(bx, by - AndroidUtilities.dp(5), bx, by + AndroidUtilities.dp(5), plusPaint);
+                    }
                     if (avatarImage != null && avatarProgressView.getVisibility() == VISIBLE) {
                         paint.setAlpha((int) (0x55 * avatarImage.getImageReceiver().getCurrentAlpha() * avatarProgressView.getAlpha()));
                         canvas.drawCircle(getMeasuredWidth() / 2.0f, getMeasuredHeight() / 2.0f, getMeasuredWidth() / 2.0f, paint);
@@ -8174,12 +8417,22 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 }
             };
             avatarContainer.addView(avatarOverlay, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+            // soft press: shrinks on touch, springs back on release
+            avatarOverlay.setOnTouchListener((v, event) -> {
+                final int action = event.getAction();
+                if (action == MotionEvent.ACTION_DOWN) {
+                    avatarContainer.animate().scaleX(0.94f).scaleY(0.94f).setDuration(120).setInterpolator(CubicBezierInterpolator.EASE_OUT).start();
+                } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                    avatarContainer.animate().scaleX(1f).scaleY(1f).setDuration(320).setInterpolator(new android.view.animation.OvershootInterpolator(2.2f)).start();
+                }
+                return false;
+            });
             avatarOverlay.setOnClickListener(view -> {
                 imageUpdater.openMenu(avatar != null, () -> {
                     avatar = null;
                     avatarBig = null;
                     showAvatarProgress(false, true);
-                    avatarImage.setImage(null, null, avatarDrawable, null);
+                    avatarImage.setImage(null, null, avatarPlaceholder, null);
                     avatarEditor.setAnimation(cameraDrawable);
                     cameraDrawable.setCurrentFrame(0);
                     isCameraWaitAnimationAllowed = true;
@@ -8272,39 +8525,34 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
             titleTextView = new TextView(context);
             titleTextView.setText(getString(R.string.RegistrationProfileInfo));
-            titleTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 18);
+            titleTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 28);
             titleTextView.setTypeface(AndroidUtilities.bold());
             titleTextView.setLineSpacing(AndroidUtilities.dp(2), 1.0f);
             titleTextView.setGravity(Gravity.CENTER_HORIZONTAL);
-            addView(titleTextView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 8, 12, 8, 0));
+            addView(titleTextView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 16, 22, 16, 0));
 
             descriptionTextView = new TextView(context);
             descriptionTextView.setText(getString("RegisterText2", R.string.RegisterText2));
             descriptionTextView.setGravity(Gravity.CENTER_HORIZONTAL);
-            descriptionTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+            descriptionTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
             descriptionTextView.setLineSpacing(AndroidUtilities.dp(2), 1.0f);
-            addView(descriptionTextView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 8, 6, 8, 0));
+            addView(descriptionTextView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 24, 8, 24, 0));
 
             editTextContainer = new FrameLayout(context);
-            addView(editTextContainer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 8, 21, 8, 0));
+            addView(editTextContainer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 4, 28, 4, 0));
 
-            firstNameOutlineView = new OutlineTextContainerView(context);
-            firstNameOutlineView.setText(getString(R.string.FirstName));
+            // iOS-style grouped card: [first name] / hairline / [last name]
+            LinearLayout nameCard = new LinearLayout(context);
+            nameCard.setOrientation(VERTICAL);
+            nameCard.setBackground(createIosGroupBackground(IOS_CARD_RADIUS));
+            editTextContainer.addView(nameCard, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
-            firstNameField = new EditTextBoldCursor(context);
-            firstNameField.setCursorSize(AndroidUtilities.dp(20));
-            firstNameField.setCursorWidth(1.5f);
-            firstNameField.setImeOptions(EditorInfo.IME_ACTION_NEXT | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
-            firstNameField.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
-            firstNameField.setMaxLines(1);
-            firstNameField.setInputType(InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+            firstNameOutlineView = new IosFieldRow(context);
+            firstNameOutlineView.setCorners(IOS_CARD_RADIUS, 0);
+            firstNameField = createNameField(context, getString(R.string.FirstName), EditorInfo.IME_ACTION_NEXT);
             firstNameField.setOnFocusChangeListener((v, hasFocus) -> firstNameOutlineView.animateSelection(hasFocus ? 1f : 0f));
-            firstNameField.setBackground(null);
-            firstNameField.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(16), AndroidUtilities.dp(16), AndroidUtilities.dp(16));
-
-            firstNameOutlineView.attachEditText(firstNameField);
-            firstNameOutlineView.addView(firstNameField, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
-
+            firstNameOutlineView.addView(firstNameField, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+            nameCard.addView(firstNameOutlineView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 52));
             firstNameField.setOnEditorActionListener((textView, i, keyEvent) -> {
                 if (i == EditorInfo.IME_ACTION_NEXT) {
                     lastNameField.requestFocus();
@@ -8312,24 +8560,33 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 }
                 return false;
             });
+            firstNameField.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
-            lastNameOutlineView = new OutlineTextContainerView(context);
-            lastNameOutlineView.setText(getString(R.string.LastName));
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {}
 
-            lastNameField = new EditTextBoldCursor(context);
-            lastNameField.setCursorSize(AndroidUtilities.dp(20));
-            lastNameField.setCursorWidth(1.5f);
-            lastNameField.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
-            lastNameField.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
-            lastNameField.setMaxLines(1);
-            lastNameField.setInputType(InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+                @Override
+                public void afterTextChanged(Editable s) {
+                    if (views != null && views[currentViewNum] == LoginActivityRegisterView.this) {
+                        updateContinueState(true);
+                    }
+                }
+            });
+
+            View nameDivider = new View(context);
+            nameDivider.setBackgroundColor(iosSeparatorColor());
+            LinearLayout.LayoutParams nameDividerParams = new LinearLayout.LayoutParams(LayoutHelper.MATCH_PARENT, Math.max(1, AndroidUtilities.dp(0.5f)));
+            nameDividerParams.leftMargin = dp(16);
+            nameCard.addView(nameDivider, nameDividerParams);
+
+            lastNameOutlineView = new IosFieldRow(context);
+            lastNameOutlineView.setCorners(0, IOS_CARD_RADIUS);
+            lastNameField = createNameField(context, getString(R.string.LastName), EditorInfo.IME_ACTION_DONE);
             lastNameField.setOnFocusChangeListener((v, hasFocus) -> lastNameOutlineView.animateSelection(hasFocus ? 1f : 0f));
-            lastNameField.setBackground(null);
-            lastNameField.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(16), AndroidUtilities.dp(16), AndroidUtilities.dp(16));
-
-            lastNameOutlineView.attachEditText(lastNameField);
-            lastNameOutlineView.addView(lastNameField, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
-
+            lastNameOutlineView.addView(lastNameField, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+            nameCard.addView(lastNameOutlineView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 52));
             lastNameField.setOnEditorActionListener((textView, i, keyEvent) -> {
                 if (i == EditorInfo.IME_ACTION_DONE || i == EditorInfo.IME_ACTION_NEXT) {
                     onNextPressed(null);
@@ -8337,7 +8594,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 }
                 return false;
             });
-            buildEditTextLayout(AndroidUtilities.isSmallScreen());
 
             wrongNumber = new TextView(context);
             wrongNumber.setText(getString("CancelRegistration", R.string.CancelRegistration));
@@ -8359,10 +8615,10 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
             privacyView = new TextView(context);
             privacyView.setMovementMethod(new AndroidUtilities.LinkMovementMethodMy());
-            privacyView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, AndroidUtilities.isSmallScreen() ? 13 : 14);
+            privacyView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
             privacyView.setLineSpacing(AndroidUtilities.dp(2), 1.0f);
-            privacyView.setGravity(Gravity.CENTER_VERTICAL);
-            privacyLayout.addView(privacyView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, 56, Gravity.LEFT | Gravity.BOTTOM, 14, 0, 70, 32));
+            privacyView.setGravity(Gravity.CENTER_HORIZONTAL);
+            privacyLayout.addView(privacyView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM, 28, 0, 28, 28));
             VerticalPositionAutoAnimator.attach(privacyView);
 
             String str = getString("TermsOfServiceLogin", R.string.TermsOfServiceLogin);
@@ -8383,47 +8639,40 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             titleTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
             descriptionTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText6));
             firstNameField.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
-            firstNameField.setCursorColor(Theme.getColor(Theme.key_windowBackgroundWhiteInputFieldActivated));
+            firstNameField.setHintTextColor(0xFF8E8E93);
+            firstNameField.setCursorColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
             lastNameField.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
-            lastNameField.setCursorColor(Theme.getColor(Theme.key_windowBackgroundWhiteInputFieldActivated));
-            wrongNumber.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
+            lastNameField.setHintTextColor(0xFF8E8E93);
+            lastNameField.setCursorColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+            wrongNumber.setTextColor(loginAccent());
             privacyView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText6));
-            privacyView.setLinkTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteLinkText));
+            privacyView.setLinkTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
 
             firstNameOutlineView.updateColor();
             lastNameOutlineView.updateColor();
         }
 
-        private void buildEditTextLayout(boolean small) {
-            boolean firstHasFocus = firstNameField.hasFocus(), lastHasFocus = lastNameField.hasFocus();
-            editTextContainer.removeAllViews();
+        private EditTextBoldCursor createNameField(Context context, String hint, int imeAction) {
+            EditTextBoldCursor field = new EditTextBoldCursor(context);
+            field.setCursorSize(AndroidUtilities.dp(20));
+            field.setCursorWidth(1.5f);
+            field.setImeOptions(imeAction | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+            field.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
+            field.setMaxLines(1);
+            field.setInputType(InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+            field.setHint(hint);
+            field.setHintTextColor(0xFF8E8E93);
+            field.setGravity(Gravity.CENTER_VERTICAL | (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT));
+            field.setBackground(null);
+            field.setPadding(AndroidUtilities.dp(16), 0, AndroidUtilities.dp(16), 0);
+            return field;
+        }
 
-            if (small) {
-                LinearLayout linearLayout = new LinearLayout(getParentActivity());
-                linearLayout.setOrientation(HORIZONTAL);
-
-                firstNameOutlineView.setText(getString(R.string.FirstNameSmall));
-                lastNameOutlineView.setText(getString(R.string.LastNameSmall));
-
-                linearLayout.addView(firstNameOutlineView, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f, 0, 0, 8, 0));
-                linearLayout.addView(lastNameOutlineView, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f, 8, 0, 0, 0));
-
-                editTextContainer.addView(linearLayout);
-
-                if (firstHasFocus) {
-                    firstNameField.requestFocus();
-                    AndroidUtilities.showKeyboard(firstNameField);
-                } else if (lastHasFocus) {
-                    lastNameField.requestFocus();
-                    AndroidUtilities.showKeyboard(lastNameField);
-                }
-            } else {
-                firstNameOutlineView.setText(getString(R.string.FirstName));
-                lastNameOutlineView.setText(getString(R.string.LastName));
-
-                editTextContainer.addView(firstNameOutlineView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP, 8, 0, 8, 0));
-                editTextContainer.addView(lastNameOutlineView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP, 8, 82, 8, 0));
+        private void updateContinueState(boolean animated) {
+            if (floatingButton == null || firstNameField == null) {
+                return;
             }
+            floatingButton.setPillActive(firstNameField.length() > 0, animated);
         }
 
         @Override
@@ -8431,7 +8680,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             AndroidUtilities.runOnUIThread(() -> {
                 avatar = smallSize.location;
                 avatarBig = bigSize.location;
-                avatarImage.setImage(ImageLocation.getForLocal(avatar), "50_50", avatarDrawable, null);
+                avatarImage.setImage(ImageLocation.getForLocal(avatar), "50_50", avatarPlaceholder, null);
             });
         }
 
@@ -8531,6 +8780,10 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         @Override
         public void onShow() {
             super.onShow();
+            updateContinueState(false);
+            if (!restoringState) {
+                playIosEnter(avatarContainerView, titleTextView, descriptionTextView, editTextContainer);
+            }
             if (privacyView != null) {
                 if (restoringState) {
                     privacyView.setAlpha(1f);
@@ -8748,7 +9001,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 public void onAnimationEnd(Animator animation) {
                     keyboardLinearLayout.setAlpha(1);
                     startMessagingButton.setVisibility(View.VISIBLE);
-                    ThemeBind.backgroundColor(fragmentView, Theme.key_windowBackgroundWhite);
+                    fragmentView.setBackgroundColor(loginBackground());
                     floatingButton.setButtonVisible(true, false);
 
                     FrameLayout frameLayout = (FrameLayout) fragmentView;
@@ -8763,7 +9016,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                     callback.run();
                 }
             });
-            int bgColor = Theme.getColor(Theme.key_windowBackgroundWhite);
+            int bgColor = loginBackground();
             int initialAlpha = Color.alpha(bgColor);
             animator.addUpdateListener(animation -> {
                 float val = (float) animation.getAnimatedValue();
@@ -8802,7 +9055,8 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     }
 
     private void updateColors() {
-        fragmentView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+        fragmentView.setBackgroundColor(loginBackground());
+        applyPillTheme(floatingButton);
 
         backButtonFilterColor = applyColorFilter(backButtonView, Theme.getColor(Theme.key_windowBackgroundWhiteBlackText), backButtonFilterColor, PorterDuff.Mode.SRC_ATOP);
         backButtonSelectorColor = applySelectorBackground(backButtonView, Theme.getColor(Theme.key_listSelector), backButtonSelectorColor, Theme.RIPPLE_MASK_CIRCLE_20DP);
@@ -8814,7 +9068,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         }
         proxyButtonSelectorColor = applySelectorBackground(proxyButtonView, Theme.getColor(Theme.key_listSelector), proxyButtonSelectorColor, Theme.RIPPLE_MASK_CIRCLE_20DP);
 
-        radialProgressView.setProgressColor(Theme.getColor(Theme.key_chats_actionBackground));
+        radialProgressView.setProgressColor(loginAccent());
 
         floatingButton.updateColors();
         floatingButtonIcon.setColor(Theme.getColor(Theme.key_chats_actionIcon));
@@ -8968,11 +9222,21 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
 
             fabButton = new FragmentFloatingButton(context, null);
-            fabButton.addView(fabTransform, LayoutHelper.createFrame(56, 56, Gravity.CENTER));
-            fabButton.addAdditionalView(fabTransform);
+            final boolean pill = fabContainer instanceof FragmentFloatingButton && ((FragmentFloatingButton) fabContainer).isPillMode();
+            if (pill) {
+                fabButton.setPillMode(((FragmentFloatingButton) fabContainer).getPillText(), IOS_BUTTON_RADIUS);
+                applyPillTheme(fabButton);
+            } else {
+                fabButton.addView(fabTransform, LayoutHelper.createFrame(56, 56, Gravity.CENTER));
+                fabButton.addAdditionalView(fabTransform);
+            }
             fabButton.setOnClickListener(v -> callback.onFabPressed(this, fabTransform));
             fabButton.setContentDescription(getString(R.string.Done));
-            addView(fabButton, LayoutHelper.createFrame(56, 56, Gravity.TOP | Gravity.LEFT));
+            if (pill) {
+                addView(fabButton, new FrameLayout.LayoutParams(Math.max(fabContainer.getWidth(), AndroidUtilities.dp(56)), Math.max(fabContainer.getHeight(), AndroidUtilities.dp(50)), Gravity.TOP | Gravity.LEFT));
+            } else {
+                addView(fabButton, LayoutHelper.createFrame(56, 56, Gravity.TOP | Gravity.LEFT));
+            }
 
             popupLayout = new FrameLayout(context);
 
@@ -9151,6 +9415,10 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         private String phoneNumber;
     }
 
+    public int getNavigationBarColor() {
+        return loginBackground();
+    }
+
     @Override
     public boolean isLightStatusBar() {
         int color = Theme.getColor(Theme.key_windowBackgroundWhite, null, true);
@@ -9313,6 +9581,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             addView(confirmTextView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 8, 5, 8, 16));
 
             outlineField = new OutlineTextContainerView(context);
+            outlineField.setMonochrome(true);
             outlineField.setText(getString(a == 0 ? R.string.SMSWord : R.string.SMSPhrase));
 
             codeField = new EditTextBoldCursor(context) {
@@ -9387,9 +9656,9 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             pasteTextView.setText(getString(R.string.Paste));
             pasteTextView.setPadding(dp(10), 0, dp(10), 0);
             pasteTextView.setGravity(Gravity.CENTER);
-            int textColor = Theme.getColor(Theme.key_windowBackgroundWhiteBlueText2, resourceProvider);
-            ThemeBind.textColor(pasteTextView, Theme.key_windowBackgroundWhiteBlueText2, resourceProvider);
-            ThemeBind.selectorBackground(pasteTextView, Theme.createSimpleSelectorRoundRectDrawable(dp(6), Theme.multAlpha(textColor, .12f), Theme.multAlpha(textColor, .15f)), ThemeBind.multAlpha(Theme.key_windowBackgroundWhiteBlueText2, .12f), ThemeBind.multAlpha(Theme.key_windowBackgroundWhiteBlueText2, .15f), resourceProvider);
+            int textColor = loginAccent();
+            pasteTextView.setTextColor(textColor);
+            ThemeBind.selectorBackground(pasteTextView, Theme.createSimpleSelectorRoundRectDrawable(dp(6), Theme.multAlpha(textColor, .12f), Theme.multAlpha(textColor, .15f)), ThemeBind.multAlpha(Theme.key_windowBackgroundWhiteBlackText, .12f), ThemeBind.multAlpha(Theme.key_windowBackgroundWhiteBlackText, .15f), resourceProvider);
             ScaleStateListAnimator.apply(pasteTextView, .1f, 1.5f);
             codeField.setPadding(dp(16), dp(16 - 2.66f), dp(16), dp(16 - 2.66f));
             pasteTextView.setOnClickListener(v -> {
@@ -9611,7 +9880,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             codeField.setCursorColor(getThemedColor(Theme.key_windowBackgroundWhiteInputFieldActivated));
             codeField.setHintTextColor(getThemedColor(Theme.key_windowBackgroundWhiteHintText));
             outlineField.updateColor();
-//            cancelButton.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
+//            cancelButton.setTextColor(loginAccent());
         }
 
         @Override
@@ -10080,8 +10349,8 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                                 } else {
                                     timeText.setText(replaceArrows(getString(R.string.RequestAnotherSMS), true, 0, 0));
                                 }
-                                ThemeBind.textColor(timeText, Theme.key_chats_actionBackground);
-                                timeText.setTag(R.id.color_key_tag, Theme.key_chats_actionBackground);
+                                timeText.setTextColor(loginAccent());
+                                timeText.setTag(R.id.color_key_tag, Theme.key_windowBackgroundWhiteBlackText);
                             }
                         }
                     });

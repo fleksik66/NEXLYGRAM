@@ -25,6 +25,8 @@ public class CodeFieldContainer extends LinearLayout {
 
     Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     Paint bitmapPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private boolean iosStyle;
     float strokeWidth;
     public boolean ignoreOnTextChange;
     public boolean isFocusSuppressed;
@@ -35,6 +37,14 @@ public class CodeFieldContainer extends LinearLayout {
         super(context);
         paint.setStyle(Paint.Style.STROKE);
         setOrientation(HORIZONTAL);
+    }
+
+    /** iOS look: filled rounded cells, border appears only on focus / error / success. */
+    public void setIosStyle(boolean iosStyle) {
+        this.iosStyle = iosStyle;
+        fillPaint.setStyle(Paint.Style.FILL);
+        fillPaint.setColor(0xFF1C1C1E);
+        invalidate();
     }
 
     @Override
@@ -57,7 +67,9 @@ public class CodeFieldContainer extends LinearLayout {
                     }
                 }
                 float successProgress = codeField.getSuccessProgress();
-                int focusClr = ColorUtils.blendARGB(Theme.getColor(Theme.key_windowBackgroundWhiteInputField), Theme.getColor(Theme.key_windowBackgroundWhiteInputFieldActivated), codeField.getFocusedProgress());
+                int focusClr = iosStyle
+                        ? ColorUtils.blendARGB(Theme.isCurrentThemeDark() ? 0x00FFFFFF : 0x00000000, Theme.isCurrentThemeDark() ? 0xB3FFFFFF : 0xB3000000, codeField.getFocusedProgress())
+                        : ColorUtils.blendARGB(Theme.getColor(Theme.key_windowBackgroundWhiteInputField), Theme.getColor(Theme.key_windowBackgroundWhiteInputFieldActivated), codeField.getFocusedProgress());
                 int errorClr = ColorUtils.blendARGB(focusClr, Theme.getColor(Theme.key_text_RedBold), codeField.getErrorProgress());
                 paint.setColor(ColorUtils.blendARGB(errorClr, Theme.getColor(Theme.key_checkbox), successProgress));
                 AndroidUtilities.rectTmp.set(child.getLeft(), child.getTop(), child.getRight(), child.getBottom());
@@ -67,7 +79,12 @@ public class CodeFieldContainer extends LinearLayout {
                     AndroidUtilities.rectTmp.inset(offset, offset);
                 }
 
-                canvas.drawRoundRect(AndroidUtilities.rectTmp, AndroidUtilities.dp(4), AndroidUtilities.dp(4), paint);
+                final float radius = AndroidUtilities.dp(iosStyle ? 10 : 4);
+                if (iosStyle) {
+                    fillPaint.setColor(Theme.isCurrentThemeDark() ? 0xFF1C1C1E : 0xFFF2F2F7);
+                    canvas.drawRoundRect(AndroidUtilities.rectTmp, radius, radius, fillPaint);
+                }
+                canvas.drawRoundRect(AndroidUtilities.rectTmp, radius, radius, paint);
             }
         }
         super.dispatchDraw(canvas);
@@ -192,6 +209,11 @@ public class CodeFieldContainer extends LinearLayout {
                     width = 28;
                     height = 34;
                     gapSize = 5;
+                } else if (iosStyle) {
+                    width = 42;
+                    height = 52;
+                    gapSize = 9;
+                    codeField[a].setTextSize(TypedValue.COMPLEX_UNIT_DIP, 24);
                 } else {
                     width = 34;
                     height = 42;

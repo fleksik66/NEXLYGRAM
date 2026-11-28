@@ -4,21 +4,28 @@ import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.AndroidUtilities.dpf2;
 import static org.telegram.messenger.AndroidUtilities.lerp;
 
+import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Outline;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.view.Gravity;
+import android.util.TypedValue;
 import android.view.View;
+import android.view.ViewOutlineProvider;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RawRes;
+import androidx.core.graphics.ColorUtils;
 
+import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.utils.ViewOutlineProviderImpl;
 import org.telegram.ui.ActionBar.Theme;
@@ -103,6 +110,111 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
         updateColors();
     }
 
+    // ---------- iOS-style wide "Continue" pill ----------
+    private boolean pillMode;
+    private int pillCornerPx;
+    private CharSequence pillText;
+    private TextView pillTextView;
+    private int pillBg = 0xFFFFFFFF, pillPressed = 0xFFD1D1D6, pillTextColor = 0xFF000000;
+    private int pillBgOff = 0xFF2C2C2E, pillTextOff = 0xFF6C6C70;
+    private float pillActive = 1f;
+    private ValueAnimator pillActiveAnimator;
+
+    public boolean isPillMode() {
+        return pillMode;
+    }
+
+    public CharSequence getPillText() {
+        return pillText;
+    }
+
+    public void setPillMode(CharSequence text, int cornerDp) {
+        pillMode = true;
+        pillText = text;
+        pillCornerPx = dp(cornerDp);
+        setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), pillCornerPx);
+            }
+        });
+        setTranslationZ(0);
+        if (pillTextView == null) {
+            pillTextView = new TextView(getContext());
+            pillTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
+            pillTextView.setTypeface(AndroidUtilities.bold());
+            pillTextView.setGravity(Gravity.CENTER);
+            pillTextView.setSingleLine(true);
+            addView(pillTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+            addAdditionalView(pillTextView);
+        }
+        pillTextView.setText(text);
+        themedBackground = null;
+        updateColors();
+    }
+
+    /** Theme-dependent colours: active bg/pressed/text and the dimmed (inactive) bg/text. */
+    public void setPillColors(int bg, int pressed, int text, int bgOff, int textOff) {
+        if (pillBg == bg && pillPressed == pressed && pillTextColor == text && pillBgOff == bgOff && pillTextOff == textOff) {
+            return;
+        }
+        pillBg = bg;
+        pillPressed = pressed;
+        pillTextColor = text;
+        pillBgOff = bgOff;
+        pillTextOff = textOff;
+        if (pillMode) {
+            themedBackground = null;
+            updateColors();
+        }
+    }
+
+    public void setPillText(CharSequence text) {
+        pillText = text;
+        if (pillTextView != null) {
+            pillTextView.setText(text);
+        }
+    }
+
+    /** active = white button, inactive = dark gray (iOS disabled look). Stays clickable on purpose, so tapping shows the field error. */
+    public void setPillActive(boolean active, boolean animated) {
+        final float to = active ? 1f : 0f;
+        if (pillActiveAnimator != null) {
+            pillActiveAnimator.cancel();
+            pillActiveAnimator = null;
+        }
+        if (!animated) {
+            pillActive = to;
+            applyPillActive();
+            return;
+        }
+        if (pillActive == to) {
+            return;
+        }
+        pillActiveAnimator = ValueAnimator.ofFloat(pillActive, to);
+        pillActiveAnimator.setDuration(220);
+        pillActiveAnimator.addUpdateListener(a -> {
+            pillActive = (float) a.getAnimatedValue();
+            applyPillActive();
+        });
+        pillActiveAnimator.start();
+    }
+
+    private void applyPillActive() {
+        if (!pillMode) {
+            return;
+        }
+        final int bg = ColorUtils.blendARGB(pillBgOff, pillBg, pillActive);
+        final int tx = ColorUtils.blendARGB(pillTextOff, pillTextColor, pillActive);
+        if (themedBackground != null) {
+            Theme.setSelectorDrawableColor(themedBackground, bg, false);
+            themedBackground.invalidateSelf();
+        }
+        if (pillTextView != null) {
+            pillTextView.setTextColor(tx);
+        }
+    }
+
     public void setProgressVisible(boolean visible, boolean animated) {
         animatorProgressVisible.setValue(visible, animated);
     }
@@ -122,7 +234,14 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
     @Override
     public void onFactorChanged(int id, float factor, float fraction, FactorAnimator callee) {
         if (id == ANIMATOR_ID_BUTTON_VISIBLE) {
-            setAnimatedVisibility(this, factor);
+            if (pillMode) {
+                setAlpha(factor);
+                setScaleX(lerp(0.94f, 1f, factor));
+                setScaleY(lerp(0.94f, 1f, factor));
+                setVisibility(factor > 0 ? VISIBLE : GONE);
+            } else {
+                setAnimatedVisibility(this, factor);
+            }
             setClickable(factor >= 0.99f);
             setAdditionalTranslationY(dp(isSubButton ? 64 : 40) * (1f - factor));
         } else if (id == ANIMATOR_ID_PROGRESS_VISIBLE) {
@@ -189,6 +308,12 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
             } else {
                 setBackground(themedBackground = Theme.createInsetRoundRectDrawable(themedBackgroundPressedColor = pressedColor, rad, dp(6)));
             }
+        } else if (pillMode) {
+            progressView.setProgressColor(pillTextColor);
+            if (themedBackground == null || getBackground() != themedBackground) {
+                setBackground(themedBackground = Theme.createSimpleSelectorRoundRectDrawable(pillCornerPx, pillBg, pillPressed));
+            }
+            applyPillActive();
         } else {
             final int iconColor = Theme.getColor(Theme.key_chats_actionIcon, resourcesProvider);
             if (iconColor != themedIconColor || !themedIconColorSet) {
@@ -229,6 +354,10 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
                 20, 0, 20, 14);
     }
 
+
+    public static FrameLayout.LayoutParams createPillLayoutParams() {
+        return LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 50, Gravity.BOTTOM, 24, 0, 24, 14);
+    }
 
     public static FrameLayout.LayoutParams createDefaultLayoutParamsBig() {
         return LayoutHelper.createFrame(56, 56,

@@ -261,10 +261,7 @@ public class CustomPhoneKeyboardView extends ViewGroup {
         final int pressedColor = ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_listSelector), 30);
 
         return Theme.createSimpleSelectorRoundRectDrawable(
-            dp(isLeft && isTop ? 24 : 12),
-            dp(isRight && isTop ? 24 : 12),
-            dp(isRight && isBottom ? 24 : 12),
-            dp(/*index == 10 || index == 6 ||*/ isLeft && isBottom ? 24 : 12),
+            dp(10), dp(10), dp(10), dp(10),
             defaultColor, pressedColor, pressedColor);
     }
 
@@ -318,7 +315,8 @@ public class CustomPhoneKeyboardView extends ViewGroup {
             mSymbols = symbols;
 
             numberTextPaint.setTextSize(dp(24));
-            symbolsTextPaint.setTextSize(dp(14));
+            symbolsTextPaint.setTextSize(dp(10));
+            symbolsTextPaint.setLetterSpacing(0.14f);
 
             applyColors();
         }
@@ -336,16 +334,20 @@ public class CustomPhoneKeyboardView extends ViewGroup {
 
         @Override
         protected void onDraw(Canvas canvas) {
-            float symbolsWidth = symbolsTextPaint.measureText(mSymbols);
-            float numberWidth = numberTextPaint.measureText(mNumber);
-
+            final float cx = getWidth() / 2f;
             numberTextPaint.getTextBounds(mNumber, 0, mNumber.length(), rect);
-            float textOffsetNumber = rect.height() / 2f;
-            symbolsTextPaint.getTextBounds(mSymbols, 0, mSymbols.length(), rect);
-            float textOffsetSymbols = rect.height() / 2f;
-
-            canvas.drawText(mNumber, getWidth() * 0.25f - numberWidth / 2f, getHeight() / 2f + textOffsetNumber, numberTextPaint);
-            canvas.drawText(mSymbols, getWidth() * 0.7f - symbolsWidth / 2f, getHeight() / 2f + textOffsetSymbols, symbolsTextPaint);
+            final float numberHeight = rect.height();
+            final float numberWidth = numberTextPaint.measureText(mNumber);
+            if (mSymbols.isEmpty()) {
+                canvas.drawText(mNumber, cx - numberWidth / 2f, getHeight() / 2f + numberHeight / 2f, numberTextPaint);
+                return;
+            }
+            final float symbolsWidth = symbolsTextPaint.measureText(mSymbols);
+            final float capHeight = symbolsTextPaint.getTextSize() * 0.72f;
+            final float gap = dp(3);
+            final float top = (getHeight() - (numberHeight + gap + capHeight)) / 2f;
+            canvas.drawText(mNumber, cx - numberWidth / 2f, top + numberHeight, numberTextPaint);
+            canvas.drawText(mSymbols, cx - symbolsWidth / 2f, top + numberHeight + gap + capHeight, symbolsTextPaint);
         }
     }
 }

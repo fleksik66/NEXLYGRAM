@@ -145,6 +145,10 @@ public class OutlineTextContainerView extends FrameLayout implements Theme.Color
 
     public void attachEditText(EditText attachedEditText) {
         this.attachedEditText = attachedEditText;
+        if (filledStyle && attachedEditText != null) {
+            // room for the floating label inside the filled box
+            attachedEditText.setPadding(attachedEditText.getPaddingLeft(), AndroidUtilities.dp(24), attachedEditText.getPaddingRight(), AndroidUtilities.dp(8));
+        }
         invalidate();
     }
 
@@ -158,17 +162,25 @@ public class OutlineTextContainerView extends FrameLayout implements Theme.Color
         invalidate();
     }
 
+    private int activatedColor() {
+        return monochrome ? (Theme.isCurrentThemeDark() ? Color.WHITE : Color.BLACK) : Theme.getColor(Theme.key_windowBackgroundWhiteInputFieldActivated, resourcesProvider);
+    }
+
+    private int labelActiveColor() {
+        return monochrome ? 0xFFAEAEB2 : Theme.getColor(Theme.key_windowBackgroundWhiteValueText, resourcesProvider);
+    }
+
     public void updateColor() {
-        int textSelectionColor = ColorUtils.blendARGB(Theme.getColor(Theme.key_windowBackgroundWhiteHintText, resourcesProvider), Theme.getColor(Theme.key_windowBackgroundWhiteValueText, resourcesProvider), forceUseCenter && !forceForceUseCenter ? 0f : titleProgress);
+        int textSelectionColor = ColorUtils.blendARGB(Theme.getColor(Theme.key_windowBackgroundWhiteHintText, resourcesProvider), labelActiveColor(), forceUseCenter && !forceForceUseCenter ? 0f : titleProgress);
         textPaint.setColor(ColorUtils.blendARGB(textSelectionColor, Theme.getColor(Theme.key_text_RedBold, resourcesProvider), errorProgress));
-        int selectionColor = ColorUtils.blendARGB(Theme.getColor(Theme.key_windowBackgroundWhiteInputField, resourcesProvider), Theme.getColor(Theme.key_windowBackgroundWhiteInputFieldActivated, resourcesProvider), forceUseCenter && !forceForceUseCenter ? 0f : selectionProgress);
+        int selectionColor = ColorUtils.blendARGB(Theme.getColor(Theme.key_windowBackgroundWhiteInputField, resourcesProvider), activatedColor(), forceUseCenter && !forceForceUseCenter ? 0f : selectionProgress);
         setColor(ColorUtils.blendARGB(selectionColor, Theme.getColor(Theme.key_text_RedBold, resourcesProvider), errorProgress));
     }
 
     private void applyThemeColorsOnDraw() {
-        int textSelectionColor = ColorUtils.blendARGB(Theme.getColor(Theme.key_windowBackgroundWhiteHintText, resourcesProvider), Theme.getColor(Theme.key_windowBackgroundWhiteValueText, resourcesProvider), forceUseCenter && !forceForceUseCenter ? 0f : titleProgress);
+        int textSelectionColor = ColorUtils.blendARGB(Theme.getColor(Theme.key_windowBackgroundWhiteHintText, resourcesProvider), labelActiveColor(), forceUseCenter && !forceForceUseCenter ? 0f : titleProgress);
         textPaint.setColor(ColorUtils.blendARGB(textSelectionColor, Theme.getColor(Theme.key_text_RedBold, resourcesProvider), errorProgress));
-        int selectionColor = ColorUtils.blendARGB(Theme.getColor(Theme.key_windowBackgroundWhiteInputField, resourcesProvider), Theme.getColor(Theme.key_windowBackgroundWhiteInputFieldActivated, resourcesProvider), forceUseCenter && !forceForceUseCenter ? 0f : selectionProgress);
+        int selectionColor = ColorUtils.blendARGB(Theme.getColor(Theme.key_windowBackgroundWhiteInputField, resourcesProvider), activatedColor(), forceUseCenter && !forceForceUseCenter ? 0f : selectionProgress);
         outlinePaint.setColor(ColorUtils.blendARGB(selectionColor, Theme.getColor(Theme.key_text_RedBold, resourcesProvider), errorProgress));
     }
 
@@ -251,11 +263,11 @@ public class OutlineTextContainerView extends FrameLayout implements Theme.Color
         float bottom = getHeight() - getPaddingBottom();
         float radius = AndroidUtilities.dp(12);
 
-        fillPaint.setColor(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider), 0x14));
+        fillPaint.setColor(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider), 0x1C));
         rect.set(left, top, right, bottom);
         canvas.drawRoundRect(rect, radius, radius, fillPaint);
 
-        float borderAlpha = Math.min(1f, selectionProgress + errorProgress);
+        float borderAlpha = Math.min(1f, selectionProgress * 0.45f + errorProgress);
         if (borderAlpha > 0.01f) {
             strokePaint.setColor(monochrome ? Color.WHITE : outlinePaint.getColor());
             strokePaint.setAlpha(Math.round(255 * borderAlpha));
@@ -267,7 +279,7 @@ public class OutlineTextContainerView extends FrameLayout implements Theme.Color
         boolean useCenter = attachedEditText != null && attachedEditText.length() == 0 && TextUtils.isEmpty(attachedEditText.getHint()) || forceUseCenter || forceUseCenter2;
         float t = useCenter ? titleProgress : 1f;
         float centerY = (top + bottom) / 2f + textPaint.getTextSize() / 2f - AndroidUtilities.dp(1);
-        float floatingY = top + AndroidUtilities.dp(18);
+        float floatingY = top + AndroidUtilities.dp(15);
         float baseY = centerY + (floatingY - centerY) * t;
         float scale = 1f + (0.75f - 1f) * t;
         float x = left + AndroidUtilities.dp(16);
